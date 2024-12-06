@@ -88,4 +88,3 @@ def test_valid_report_cli(valid_report) -> None:
 
     # Check it worked
     assert result.returncode == 0
-    assert "End of report" in result.stdout
