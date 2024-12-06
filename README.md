@@ -7,12 +7,19 @@ Displays a nicely formatted report in your terminal from a DMARC XML report.
 This works best when installed with `uvx` or `pipx`.
 
 ```bash
-# With uvx:
-uvx install dmarc-report
+# With uv:
+uv tool install dmarc-report
 
 # Or with pipx:
 
 pipx install dmarc-report
+```
+
+You can also run the tool with installing it:
+
+```bash
+# With uvx:
+uvx dmarc-report long-dmarc-report-filename.xml
 ```
 
 ## Usage
