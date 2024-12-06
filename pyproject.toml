@@ -1,6 +1,6 @@
 [project]
 name = "dmarc-report"
-version = "1.0.2"
+version = "1.0.3"
 description = "Displays a nicely formatted report in your terminal from a DMARC XML report."
 readme = "README.md"
 authors = [{ name = "Stuart Maxwell", email = "stuart@amanzi.nz" }]
@@ -67,7 +67,7 @@ convention = "google" # Accepts: "google", "numpy", or "pep257".
 python_files = "test_*.py"
 
 [tool.bumpver]
-current_version = "1.0.2"
+current_version = "1.0.3"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "👍 bump version {old_version} -> {new_version}"
 commit = true
