@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<feedback>
+  <report_metadata>
+    <org_name>Google, Inc.</org_name>
+    <!-- Missing closing tag for report_metadata -->
+  <policy_published>
+    <domain>example.com</domain>
+  </policy_published>
+</feedback>

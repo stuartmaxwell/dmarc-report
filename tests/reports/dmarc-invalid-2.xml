@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<feedback>
+  <report_metadata>
+    <org_name>Google, Inc.</org_name>
+    <email>noreply-dmarc-support@google.com</email>
+    <report_id>1234567890</report_id>
+    <!-- Missing date_range entirely -->
+  </report_metadata>
+  <policy_published>
+    <domain>example.com</domain>
+    <!-- Missing required policy settings -->
+  </policy_published>
+  <record>
+    <!-- Empty record -->
+  </record>
+</feedback>

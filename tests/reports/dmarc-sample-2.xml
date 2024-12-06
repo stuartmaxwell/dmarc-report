@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<feedback>
+  <report_metadata>
+    <org_name>Microsoft Corporation</org_name>
+    <email>dmarcreport@microsoft.com</email>
+    <report_id>9876543210</report_id>
+    <date_range>
+      <begin>1577836800</begin>
+      <end>1577923199</end>
+    </date_range>
+  </report_metadata>
+  <policy_published>
+    <domain>example.org</domain>
+    <adkim>s</adkim>
+    <aspf>s</aspf>
+    <p>reject</p>
+    <sp>reject</sp>
+    <pct>100</pct>
+    <fo>1</fo>
+  </policy_published>
+  <record>
+    <row>
+      <source_ip>203.0.113.2</source_ip>
+      <count>1</count>
+      <policy_evaluated>
+        <disposition>reject</disposition>
+        <dkim>fail</dkim>
+        <spf>pass</spf>
+      </policy_evaluated>
+    </row>
+    <identifiers>
+      <header_from>example.org</header_from>
+      <envelope_from>mail.example.org</envelope_from>
+    </identifiers>
+    <auth_results>
+      <dkim>
+        <domain>example.org</domain>
+        <result>fail</result>
+        <selector>mail</selector>
+        <human_result>signature verification failed</human_result>
+      </dkim>
+      <spf>
+        <domain>example.org</domain>
+        <result>pass</result>
+      </spf>
+    </auth_results>
+  </record>
+</feedback>
