@@ -31,7 +31,6 @@ keywords = [
 ]
 [project.urls]
 Homepage = "https://github.com/stuartmaxwell/dmarc-report"
-Documentation = "https://github.com/stuartmaxwell/dmarc-report/README.md"
 Repository = "https://github.com/stuartmaxwell/dmarc-report"
 Issues = "https://github.com/stuartmaxwell/dmarc-report/issues"
 
