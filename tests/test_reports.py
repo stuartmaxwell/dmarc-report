@@ -52,7 +52,7 @@ def test_reports_exist(report) -> None:
 )
 def test_invalid_report(invalid_report) -> None:
     """Test an invalid report."""
-    from dmarc_report.dmarc_parser import DMARCParser
+    from dmarc_report.parser import DMARCParser
 
     test_file = Path(__file__).parent / invalid_report
     with pytest.raises(Exception):
