@@ -4,11 +4,12 @@ from rich import box
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from dmarc_report.schema import Report
 
 
-def display_console(dmarc_report: Report) -> None:
+def display_console(dmarc_report: Report) -> None:  # noqa: PLR0915
     """Display the DMARC report using Rich tables and panels."""
     # Create the tables
     metadata_table = Table(
@@ -19,7 +20,7 @@ def display_console(dmarc_report: Report) -> None:
         expand=True,
     )
     metadata_table.add_column("Field", style="cyan", width=20)
-    metadata_table.add_column("Value", style="green", width=52)
+    metadata_table.add_column("Value", width=52)
 
     policy_table = Table(
         title="DMARC Policy Details",
@@ -29,7 +30,7 @@ def display_console(dmarc_report: Report) -> None:
         expand=True,
     )
     policy_table.add_column("Setting", style="cyan", width=20)
-    policy_table.add_column("Value", style="green", width=52)
+    policy_table.add_column("Value", width=52)
 
     stats_table = Table(
         title="Summary",
@@ -39,7 +40,7 @@ def display_console(dmarc_report: Report) -> None:
         expand=True,
     )
     stats_table.add_column("Metric", style="cyan", width=20)
-    stats_table.add_column("Value", style="green", width=52)
+    stats_table.add_column("Value", width=52)
 
     records_table = Table(
         title="Message Records",
@@ -49,9 +50,9 @@ def display_console(dmarc_report: Report) -> None:
     )
     records_table.add_column("Source IP", style="cyan")
     records_table.add_column("Count", style="magenta")
-    records_table.add_column("DKIM", style="yellow")
-    records_table.add_column("SPF", style="yellow")
-    records_table.add_column("Auth Results", style="green")
+    records_table.add_column("DKIM")
+    records_table.add_column("SPF")
+    records_table.add_column("Auth Results")
 
     # Rich Layout
     panel_group = Group(
@@ -92,19 +93,41 @@ def display_console(dmarc_report: Report) -> None:
         policy_table.add_row("Failure Options", dmarc_report.policy_published.fo)
 
     # Populate the records table
-    for record in dmarc_report.records:
-        dkim_auth_results_str = "\n".join(
-            f"dkim: {ar_d.domain} ({ar_d.result.value})" for ar_d in record.auth_results.dkim
-        )
-        spf_auth_results_str = "\n".join(
-            f"spf: {ar_s.domain} ({ar_s.result.value})" for ar_s in record.auth_results.spf
-        )
+
+    # Sort by count field descending, and by source_ip field ascending
+    records = sorted(dmarc_report.records, key=lambda record: (-record.count, record.source_ip))
+
+    for record in records:
+        auth_results = Text()
+        for ar_d in record.auth_results.dkim:
+            auth_results.append("dkim: ", style="cyan")
+            auth_results.append(ar_d.domain)
+            auth_results.append(" ")
+            auth_results.append(
+                ar_d.result.value,
+                style=f"{'green' if ar_d.result.value == 'pass' else 'bold red'}",
+            )
+            auth_results.append("\n")
+
+        for ar_d in record.auth_results.spf:
+            auth_results.append("spf: ", style="cyan")
+            auth_results.append(ar_d.domain)
+            auth_results.append(" ")
+            auth_results.append(
+                ar_d.result.value,
+                style=f"{'green' if ar_d.result.value == 'pass' else 'bold red'}",
+            )
+            auth_results.append("\n")
+
+        dkim_style = "green" if record.policy_evaluated.dkim.value == "pass" else "bold red"
+        spf_style = "green" if record.policy_evaluated.spf.value == "pass" else "bold red"
+
         records_table.add_row(
             record.source_ip,
             str(record.count),
-            record.policy_evaluated.dkim.value,
-            record.policy_evaluated.spf.value,
-            dkim_auth_results_str + "\n" + spf_auth_results_str,
+            Text(record.policy_evaluated.dkim.value, style=dkim_style),
+            Text(record.policy_evaluated.spf.value, style=spf_style),
+            auth_results,
         )
 
     console = Console()
