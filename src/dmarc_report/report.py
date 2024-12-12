@@ -6,7 +6,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from dmarc_report.dmarc_parser import DMARCParser
+from dmarc_report.display import display_console
+from dmarc_report.parser import DMARCParser
 
 
 def report() -> None:
@@ -24,7 +25,7 @@ def report() -> None:
 
     try:
         report = DMARCParser.parse_file(args.filepath)
-        report.display()
+        display_console(report)
     except Exception as e:  # noqa: BLE001
         console.print(f"[red]Error:[/red] Failed to process {filepath}: {e!s}")
         sys.exit(1)
