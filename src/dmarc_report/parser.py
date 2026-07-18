@@ -148,7 +148,7 @@ class DMARCParser:
         policy = PolicyPublished(
             domain=policy_published.findtext("domain"),
             p=policy_published.findtext("p"),
-            sp=policy_published.findtext("sp", "none"),
+            sp=policy_published.findtext("sp", "none") or "none",
             pct=int(policy_published.findtext("pct", "100")),
             adkim=policy_published.findtext("adkim", "r"),
             aspf=policy_published.findtext("aspf", "r"),
