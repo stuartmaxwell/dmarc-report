@@ -7,7 +7,14 @@ import pytest
 
 from dmarc_report.parser import DMARCParser
 
-valid_xml_reports = ["reports/dmarc-sample-1.xml", "reports/dmarc-sample-2.xml", "reports/dmarc-sample-3.xml"]
+valid_xml_reports = [
+    "reports/dmarc-sample-1.xml",
+    "reports/dmarc-sample-2.xml",
+    "reports/dmarc-sample-3.xml",
+    "reports/dmarc-empty-sp.xml",
+    "reports/dmarc-feedback_namespace.xml",
+]
+
 invalid_xml_reports = [
     "reports/dmarc-invalid-1.xml",
     "reports/dmarc-invalid-2.xml",
