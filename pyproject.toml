@@ -3,9 +3,14 @@ name = "dmarc-report"
 version = "1.1.0"
 description = "Displays a nicely formatted report in your terminal from a DMARC XML report."
 readme = "README.md"
-authors = [{ name = "Stuart Maxwell", email = "stuart@amanzi.nz" }]
-requires-python = ">=3.9"
-dependencies = ["defusedxml>=0.7.1", "rich>=13.9.4"]
+authors = [
+    { name = "Stuart Maxwell", email = "stuart@amanzi.nz" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "defusedxml>=0.7.1",
+    "rich>=13.9.4",
+]
 license = { file = "LICENSE" }
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -14,11 +19,11 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 keywords = [
     "dmarc",
@@ -38,30 +43,17 @@ Issues = "https://github.com/stuartmaxwell/dmarc-report/issues"
 dmarc-report = "dmarc_report.report:report"
 
 [dependency-groups]
-dev = ["bumpver>=2024.1130"]
-
-[project.optional-dependencies]
-test = ["nox>=2024.10.9", "pytest>=8.3.4"]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.ruff]
-line-length = 120
-target-version = "py313"
-select = ["ALL"]
-ignore = [
-    "D203",  # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
-    "D213",  # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
-    "UP007",
+dev = [
+    "bumpver~=2026.1132",
+    "nox[pbs]~=2026.7",
+    "pytest~=9.1",
+    "ruff~=0.15",
+    "pre-commit~=4.6",
 ]
 
-[tool.ruff.lint.pydocstyle]
-convention = "google" # Accepts: "google", "numpy", or "pep257".
-
-[tool.ruff.per-file-ignores]
-"test*" = ["ALL"]
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 
 [tool.pytest.ini_options]
 python_files = "test_*.py"
@@ -77,3 +69,6 @@ tag = true
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['version = "{version}"']
 "src/dmarc_report/__init__.py" = ['^__version__ = "{version}"$']
+
+[tool.pdm]
+distribution = true

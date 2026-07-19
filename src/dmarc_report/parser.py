@@ -215,4 +215,4 @@ class DMARCParser:
     @staticmethod
     def _format_date_range(timestamp: int) -> str:
         """Convert UTC Unix timestamp to formatted UTC date string."""
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")  # noqa: UP017
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
