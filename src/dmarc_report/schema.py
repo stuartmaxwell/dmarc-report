@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 
 class PolicyType(Enum):
@@ -55,7 +55,7 @@ class DateRange:
     @staticmethod
     def format_timestamp(timestamp: int) -> str:
         """Convert UTC Unix timestamp to formatted UTC date string."""
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")  # noqa: UP017
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 @dataclass
@@ -69,8 +69,8 @@ class ReportMetadata:
     email: str
     report_id: str
     date_range: DateRange
-    extra_contact_info: Optional[str] = None
-    errors: Optional[list[str]] = None  # Not yet implemented
+    extra_contact_info: str | None = None
+    errors: list[str] | None = None  # Not yet implemented
 
 
 @dataclass
@@ -86,7 +86,7 @@ class PolicyPublished:
     pct: int  # 0-100
     adkim: AlignmentMode
     aspf: AlignmentMode
-    fo: Optional[str] = None
+    fo: str | None = None
 
     def __post_init__(self) -> None:
         """Convert string values to enums if needed and validate percentage."""
@@ -116,7 +116,7 @@ class PolicyEvaluated:
     disposition: PolicyType
     dkim: AuthResultType
     spf: AuthResultType
-    reason: Optional[list[dict]] = None  # type and comment. Not yet implemented
+    reason: list[dict] | None = None  # type and comment. Not yet implemented
 
     def __post_init__(self) -> None:
         """Convert string values to enums if needed."""
@@ -136,8 +136,8 @@ class Identifier:
     """
 
     header_from: str
-    envelope_to: Optional[str] = None
-    envelope_from: Optional[str] = None
+    envelope_to: str | None = None
+    envelope_from: str | None = None
 
 
 @dataclass
@@ -149,8 +149,8 @@ class DKIMAuthResult:
 
     domain: str
     result: AuthResultType
-    selector: Optional[str] = None
-    human_result: Optional[str] = None
+    selector: str | None = None
+    human_result: str | None = None
 
     def __post_init__(self) -> None:
         """Convert string values to enums if needed."""
@@ -167,8 +167,8 @@ class SPFAuthResult:
 
     domain: str
     result: AuthResultType
-    scope: Optional[str] = None
-    human_result: Optional[str] = None
+    scope: str | None = None
+    human_result: str | None = None
 
     VALID_SCOPES: ClassVar[set[str]] = {"helo", "mfrom"}
 

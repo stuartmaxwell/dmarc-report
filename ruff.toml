@@ -1,0 +1,12 @@
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = ["ALL"]
+typing-extensions = false
+
+[lint.extend-per-file-ignores]
+"tests/**" = ["B017", "PT011", "ANN001", "S101", "S603", "S607"]
+
+[lint.pydocstyle]
+convention = "google" # Accepts: "google", "numpy", or "pep257".

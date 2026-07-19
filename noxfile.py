@@ -1,10 +1,14 @@
 """Nox file."""
 
+import os
+
 import nox
 
+os.environ.update({"PDM_IGNORE_SAVED_PYTHON": "1"})
 
-@nox.session(venv_backend="uv", python=["3.9", "3.10", "3.11", "3.12", "3.13"])
+
+@nox.session(python=["3.10", "3.11", "3.12", "3.13", "3.14"])
 def test(session: nox.Session) -> None:
     """Run the test suite."""
-    session.install("-e", ".", "--extra", "test", "-r", "pyproject.toml")
+    session.run_always("pdm", "install", "--dev", external=True)
     session.run("pytest")

@@ -1,8 +1,11 @@
 """Tests for the reports module."""
 
-from pathlib import Path
 import subprocess
+from pathlib import Path
+
 import pytest
+
+from dmarc_report.parser import DMARCParser
 
 valid_xml_reports = ["reports/dmarc-sample-1.xml", "reports/dmarc-sample-2.xml", "reports/dmarc-sample-3.xml"]
 invalid_xml_reports = [
@@ -52,8 +55,6 @@ def test_reports_exist(report) -> None:
 )
 def test_invalid_report(invalid_report) -> None:
     """Test an invalid report."""
-    from dmarc_report.parser import DMARCParser
-
     test_file = Path(__file__).parent / invalid_report
     with pytest.raises(Exception):
         DMARCParser.parse_file(test_file)
@@ -68,7 +69,7 @@ def test_invalid_report_cli(invalid_report) -> None:
     test_file = Path(__file__).parent / invalid_report
 
     # Run the command
-    result = subprocess.run(["dmarc-report", str(test_file)], capture_output=True, text=True)
+    result = subprocess.run(["dmarc-report", str(test_file)], check=False, capture_output=True, text=True)
 
     # Check it worked
     assert result.returncode == 1
@@ -84,7 +85,7 @@ def test_valid_report_cli(valid_report) -> None:
     test_file = Path(__file__).parent / valid_report
 
     # Run the command
-    result = subprocess.run(["dmarc-report", str(test_file)], capture_output=True, text=True)
+    result = subprocess.run(["dmarc-report", str(test_file)], check=False, capture_output=True, text=True)
 
     # Check it worked
     assert result.returncode == 0
