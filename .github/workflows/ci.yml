@@ -25,7 +25,7 @@ jobs:
   publish:
     name: Publish release to PyPI
     runs-on: ubuntu-latest
-    environment: pypi
+    environment: release
     permissions:
       contents: read
       id-token: write
