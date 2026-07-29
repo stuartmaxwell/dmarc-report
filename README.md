@@ -47,34 +47,35 @@ You'll see a nicely formatted report in your terminal:
 ╭────────────────────────── DMARC Report for example.com ──────────────────────────╮
 │                               DMARC Policy Details                               │
 │ ╭───────────────────────┬──────────────────────────────────────────────────────╮ │
-│ │ Domain                │ example.com                                          │ │
-│ │ DKIM Alignment        │ r                                                    │ │
-│ │ SPF Alignment         │ r                                                    │ │
-│ │ Policy                │ quarantine                                           │ │
-│ │ Subdomain Policy      │ reject                                               │ │
-│ │ Percent               │ 100%                                                 │ │
+│ │ Domain:               │ example.com                                          │ │
+│ │ DKIM Alignment:       │ r                                                    │ │
+│ │ SPF Alignment:        │ r                                                    │ │
+│ │ Policy:               │ quarantine                                           │ │
+│ │ Subdomain Policy:     │ quarantine                                           │ │
+│ │ Percent:              │ 100%                                                 │ │
 │ ╰───────────────────────┴──────────────────────────────────────────────────────╯ │
 │                              DMARC Report Metadata                               │
 │ ╭───────────────────────┬──────────────────────────────────────────────────────╮ │
-│ │ Org name              │ Google, Inc.                                         │ │
-│ │ Email                 │ noreply-dmarc-support@google.com                     │ │
-│ │ Extra contact info    │ https://support.google.com/a/answer/2466580          │ │
-│ │ Report ID             │ 1234567890                                           │ │
-│ │ Date range            │ 2020-01-01 00:00:00 UTC to 2020-01-01 23:59:59 UTC   │ │
+│ │ Org name:             │ Google, Inc.                                         │ │
+│ │ Email:                │ noreply-dmarc-support@google.com                     │ │
+│ │ Extra contact info:   │ https://support.google.com/a/answer/2466580          │ │
+│ │ Report ID:            │ 1234567890                                           │ │
+│ │ Date range:           │ 2020-01-01 00:00:00 UTC to 2020-01-01 23:59:59 UTC   │ │
 │ ╰───────────────────────┴──────────────────────────────────────────────────────╯ │
 │                                     Summary                                      │
 │ ╭───────────────────────┬──────────────────────────────────────────────────────╮ │
-│ │ Total Messages        │ 2                                                    │ │
-│ │ Unique Sources        │ 1                                                    │ │
-│ │ DKIM Pass Rate        │ 0.0%                                                 │ │
-│ │ SPF Pass Rate         │ 0.0%                                                 │ │
+│ │ Total Messages:       │ 2                                                    │ │
+│ │ Unique Sources:       │ 1                                                    │ │
+│ │ DMARC Pass Rate:      │ 100.0%                                               │ │
+│ │ DKIM Alignment:       │ 100.0%                                               │ │
+│ │ SPF Alignment:        │ 100.0%                                               │ │
 │ ╰───────────────────────┴──────────────────────────────────────────────────────╯ │
 │                                 Message Records                                  │
-│ ╭─────────────────┬─────────┬────────┬────────┬────────────────────────────────╮ │
-│ │ Source IP       │ Count   │ DKIM   │ SPF    │ Auth Results                   │ │
-│ ├─────────────────┼─────────┼────────┼────────┼────────────────────────────────┤ │
-│ │ 203.0.113.1     │ 2       │ pass   │ pass   │ dkim: example.com (pass)       │ │
-│ │                 │         │        │        │ spf: example.com (pass)        │ │
-│ ╰─────────────────┴─────────┴────────┴────────┴────────────────────────────────╯ │
+│ ╭─────────────┬───────┬──────────────┬─────────────┬───────────────────────────╮ │
+│ │ Source IP   │ Count │ DKIM Aligned │ SPF Aligned │ Authentication Results    │ │
+│ ├─────────────┼───────┼──────────────┼─────────────┼───────────────────────────┤ │
+│ │ 123.0.456.1 │ 2     │ pass         │ pass        │ dkim: example.com (pass)  │ │
+│ │             │       │              │             │ spf: example.com (pass)   │ │
+│ ╰─────────────┴───────┴──────────────┴─────────────┴───────────────────────────╯ │
 ╰──────────────────────────────────────────────────────────────────────────────────╯
 ```
