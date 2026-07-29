@@ -248,8 +248,15 @@ class Report:
         total_messages = sum(record.count for record in self.records)
 
         # Calculate pass rates
-        dkim_pass = sum(record.count for record in self.records if record.policy_evaluated.dkim == "pass")
-        spf_pass = sum(record.count for record in self.records if record.policy_evaluated.spf == "pass")
+        dkim_pass = sum(record.count for record in self.records if record.policy_evaluated.dkim == AuthResultType.PASS)
+        spf_pass = sum(record.count for record in self.records if record.policy_evaluated.spf == AuthResultType.PASS)
+        # DMARC passes if DKIM *or* SPF aligns — this is the actual delivery outcome, unlike the two rates
+        # above considered separately.
+        dmarc_pass = sum(
+            record.count
+            for record in self.records
+            if AuthResultType.PASS in (record.policy_evaluated.dkim, record.policy_evaluated.spf)
+        )
 
         # Count dispositions
         dispositions = {}
@@ -260,6 +267,7 @@ class Report:
         return {
             "total_messages": total_messages,
             "unique_sources": len({record.source_ip for record in self.records}),
+            "dmarc_pass_rate": dmarc_pass / total_messages if total_messages > 0 else 0,
             "dkim_pass_rate": dkim_pass / total_messages if total_messages > 0 else 0,
             "spf_pass_rate": spf_pass / total_messages if total_messages > 0 else 0,
             "dispositions": dispositions,
