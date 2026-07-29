@@ -50,47 +50,36 @@ def display_console(dmarc_report: Report) -> None:  # noqa: PLR0915
     )
     records_table.add_column("Source IP", style="cyan")
     records_table.add_column("Count", style="magenta")
-    records_table.add_column("DKIM")
-    records_table.add_column("SPF")
-    records_table.add_column("Auth Results")
-
-    # Rich Layout
-    panel_group = Group(
-        policy_table,
-        metadata_table,
-        stats_table,
-        records_table,
-    )
-    report = Panel(
-        panel_group,
-        title=f"DMARC Report for {dmarc_report.policy_published.domain}",
-        expand=False,
-        box=box.ROUNDED,
-    )
+    records_table.add_column("DKIM Aligned")
+    records_table.add_column("SPF Aligned")
+    records_table.add_column("Authentication Results")
 
     # Populate the summary statistics table
     stats = dmarc_report.summary_stats
-    stats_table.add_row("Total Messages", str(stats["total_messages"]))
-    stats_table.add_row("Unique Sources", str(stats["unique_sources"]))
-    stats_table.add_row("DKIM Pass Rate", f"{stats['dkim_pass_rate']:.1%}")
-    stats_table.add_row("SPF Pass Rate", f"{stats['spf_pass_rate']:.1%}")
+    stats_table.add_row("Total Messages:", str(stats["total_messages"]))
+    stats_table.add_row("Unique Sources:", str(stats["unique_sources"]))
+    dmarc_pass_rate = stats["dmarc_pass_rate"]
+    dmarc_pass_style = "bold green" if dmarc_pass_rate >= 1 else ""
+    stats_table.add_row("DMARC Pass Rate:", Text(f"{dmarc_pass_rate:.1%}", style=dmarc_pass_style))
+    stats_table.add_row("DKIM Aligned:", f"{stats['dkim_pass_rate']:.1%}")
+    stats_table.add_row("SPF Aligned:", f"{stats['spf_pass_rate']:.1%}")
 
     # Populate the Report Metadata table
-    metadata_table.add_row("Org name", dmarc_report.report_metadata.org_name)
-    metadata_table.add_row("Email", dmarc_report.report_metadata.email)
-    metadata_table.add_row("Extra contact info", dmarc_report.report_metadata.extra_contact_info)
-    metadata_table.add_row("Report ID", dmarc_report.report_metadata.report_id)
-    metadata_table.add_row("Date range", str(dmarc_report.report_metadata.date_range))
+    metadata_table.add_row("Org name:", dmarc_report.report_metadata.org_name)
+    metadata_table.add_row("Email:", dmarc_report.report_metadata.email)
+    metadata_table.add_row("Extra contact info:", dmarc_report.report_metadata.extra_contact_info)
+    metadata_table.add_row("Report ID:", dmarc_report.report_metadata.report_id)
+    metadata_table.add_row("Date range:", str(dmarc_report.report_metadata.date_range))
 
     # Populate the policy table
-    policy_table.add_row("Domain", dmarc_report.policy_published.domain)
-    policy_table.add_row("DKIM Alignment", dmarc_report.policy_published.adkim.value)
-    policy_table.add_row("SPF Alignment", dmarc_report.policy_published.aspf.value)
-    policy_table.add_row("Policy", dmarc_report.policy_published.p.value)
-    policy_table.add_row("Subdomain Policy", dmarc_report.policy_published.sp.value)
-    policy_table.add_row("Percent", f"{dmarc_report.policy_published.pct!s}%")
+    policy_table.add_row("Domain:", dmarc_report.policy_published.domain)
+    policy_table.add_row("DKIM Alignment:", dmarc_report.policy_published.adkim.value)
+    policy_table.add_row("SPF Alignment:", dmarc_report.policy_published.aspf.value)
+    policy_table.add_row("Policy:", dmarc_report.policy_published.p.value)
+    policy_table.add_row("Subdomain Policy:", dmarc_report.policy_published.sp.value)
+    policy_table.add_row("Percent:", f"{dmarc_report.policy_published.pct!s}%")
     if dmarc_report.policy_published.fo:
-        policy_table.add_row("Failure Options", dmarc_report.policy_published.fo)
+        policy_table.add_row("Failure Options:", dmarc_report.policy_published.fo)
 
     # Populate the records table
 
@@ -129,6 +118,17 @@ def display_console(dmarc_report: Report) -> None:  # noqa: PLR0915
             Text(record.policy_evaluated.spf.value, style=spf_style),
             auth_results,
         )
+
+    # Rich Layout
+    panels = [policy_table, metadata_table, stats_table, records_table]
+
+    panel_group = Group(*panels)
+    report = Panel(
+        panel_group,
+        title=f"DMARC Report for {dmarc_report.policy_published.domain}",
+        expand=False,
+        box=box.ROUNDED,
+    )
 
     console = Console()
     console.print(report)
