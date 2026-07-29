@@ -4,6 +4,9 @@ target-version = "py310"
 [lint]
 select = ["ALL"]
 typing-extensions = false
+ignore = [
+  "COM812", # Trailing comma missing
+]
 
 [lint.extend-per-file-ignores]
 "tests/**" = ["B017", "PT011", "ANN001", "S101", "S603", "S607"]
