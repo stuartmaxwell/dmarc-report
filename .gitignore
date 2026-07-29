@@ -17,3 +17,6 @@ htmlcov/
 
 # PDM
 .pdm-python
+
+# Ruff
+.ruff_cache/
