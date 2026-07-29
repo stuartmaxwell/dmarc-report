@@ -203,9 +203,9 @@ class DMARCParser:
                     spf=record.findtext(f".//{default_ns}spf"),
                 ),
                 identifiers=Identifier(
-                    header_from=record.findtext(f".//{default_ns}identifier/{default_ns}header_from"),
-                    envelope_from=record.findtext(f".//{default_ns}identifier/{default_ns}envelope_from"),
-                    envelope_to=record.findtext(f".//{default_ns}identifier/{default_ns}envelope_to"),
+                    header_from=record.findtext(f".//{default_ns}identifiers/{default_ns}header_from"),
+                    envelope_from=record.findtext(f".//{default_ns}identifiers/{default_ns}envelope_from"),
+                    envelope_to=record.findtext(f".//{default_ns}identifiers/{default_ns}envelope_to"),
                 ),
                 auth_results=auth_results,
             )
