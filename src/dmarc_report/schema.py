@@ -6,7 +6,7 @@ from enum import Enum
 from typing import ClassVar
 
 
-class PolicyType(Enum):
+class PolicyType(str, Enum):
     """Policy types for DMARC."""
 
     NONE = "none"
@@ -14,14 +14,14 @@ class PolicyType(Enum):
     REJECT = "reject"
 
 
-class AlignmentMode(Enum):
+class AlignmentMode(str, Enum):
     """Alignment modes for DKIM and SPF."""
 
     RELAXED = "r"
     STRICT = "s"
 
 
-class AuthResultType(Enum):
+class AuthResultType(str, Enum):
     """Authentication result types for DKIM and SPF.
 
     The AuthResultType enum corresponds to the <result> element in the <dkim> and <spf> elements of the DMARC XML
