@@ -3,6 +3,7 @@
 import gzip
 import zipfile
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from xml.etree.ElementTree import Element
 
@@ -21,14 +22,17 @@ from dmarc_report.schema import (
     SPFAuthResult,
 )
 
+# https://garykessler.net/library/file_sigs_GCK_latest.html
+GZIP_MAGIC = b"\x1f\x8b\x08"
+ZIP_MAGIC = b"PK\x03\x04"
+
 
 class DMARCParser:
     """Parse DMARC XML reports.
 
-    This class provides methods to parse DMARC XML reports from files and strings.
+    This class provides methods to parse DMARC XML reports from files and in-memory bytes.
 
-    When used with the `parse_file` method, it can handle .xml, .xml.gz, and .zip file types, and will return a Report
-    object.
+    Gzip-compressed, zip-compressed, and plain XML content are detected from the "magic bytes" rather than a filename.
     """
 
     @staticmethod
@@ -42,78 +46,62 @@ class DMARCParser:
 
         Returns:
             Report: A Report object containing the parsed DMARC report data.
+        """
+        content = Path(filepath).read_bytes()
+        return DMARCParser.parse_bytes(content)
+
+    @staticmethod
+    def parse_bytes(content: bytes) -> Report:
+        """Parse DMARC report content and return a Report object.
+
+        Handles gzip-compressed, zip-compressed, and plain XML content, detected by inspecting the leading
+        bytes.
+
+        Args:
+            content (bytes): The raw DMARC report content.
+
+        Returns:
+            Report: A Report object containing the parsed DMARC report data.
 
         Raises:
-            ValueError: If the file type is not supported.
+            ValueError: If a zip archive is provided but contains no XML file.
         """
-        filepath = Path(filepath)
-        suffix = filepath.suffix.lower()
-
-        if suffix == ".zip":
-            content = DMARCParser._read_zip(filepath)
-        elif suffix == ".gz":
-            content = DMARCParser._read_gzip(filepath)
-        elif suffix == ".xml":
-            content = DMARCParser._read_xml(filepath)
-        else:
-            msg = f"Unsupported file type: {filepath.suffix}"
-            raise ValueError(msg)
-
-        # Parse the content into a Report object
-        root = ElementTree.fromstring(content)
+        xml_content = DMARCParser._decompress(content)
+        root = ElementTree.fromstring(xml_content)
         return DMARCParser._parse_xml(root)
 
     @staticmethod
-    def _read_zip(filepath: str) -> str:
-        """Parse a zipped DMARC XML report file and return the content.
+    def _decompress(content: bytes) -> str:
+        """Decode raw DMARC report bytes to an XML string.
 
-        Looks for the first .xml file in the zip archive.
+        Detects gzip and zip compression from the content's magic bytes, and then decompresses and returns the content
+        as utf-8. If the content doesn't match gzip or zip types, then it assumes xml and returns as utf-8.
 
         Args:
-            filepath (str): Path to the zip archive containing the DMARC XML report.
+            content (bytes): The raw DMARC report content.
 
         Returns:
-            str: The content of the first XML file found in the zip archive.
+            str: The decoded XML content.
 
         Raises:
-            ValueError: If no XML file is found in the zip archive.
+            ValueError: If a zip archive is provided but contains no XML file.
         """
-        with zipfile.ZipFile(filepath) as zip_file:
-            # Find the first XML file in the archive
-            xml_files = [f for f in zip_file.namelist() if f.lower().endswith(".xml")]
-            if not xml_files:
-                msg = f"No XML file found in zip archive: {filepath}"
-                raise ValueError(msg)
+        if content.startswith(GZIP_MAGIC):
+            return gzip.decompress(content).decode("utf-8")
 
-            # Read the first XML file
-            with zip_file.open(xml_files[0]) as f:
-                return f.read().decode("utf-8")
+        if content.startswith(ZIP_MAGIC):
+            with zipfile.ZipFile(BytesIO(content)) as zip_file:
+                # Find the first XML file in the archive
+                xml_files = [f for f in zip_file.namelist() if f.lower().endswith(".xml")]
+                if not xml_files:
+                    msg = "No XML file found in zip archive"
+                    raise ValueError(msg)
 
-    @staticmethod
-    def _read_gzip(filepath: str) -> str:
-        """Parse a gzipped DMARC XML report file and return the content.
+                # Read the first XML file
+                with zip_file.open(xml_files[0]) as f:
+                    return f.read().decode("utf-8")
 
-        Args:
-            filepath (str): Path to the gzipped DMARC XML report file.
-
-        Returns:
-            str: The content of the gzipped XML file.
-        """
-        with gzip.open(filepath, "rt", encoding="utf-8") as f:
-            return f.read()
-
-    @staticmethod
-    def _read_xml(filepath: str) -> str:
-        """Parse a DMARC XML report file and return the content.
-
-        Args:
-            filepath (str): Path to the DMARC XML report file.
-
-        Returns:
-            str: The content of the XML file.
-        """
-        with Path.open(filepath, encoding="utf-8") as f:
-            return f.read()
+        return content.decode("utf-8")
 
     @staticmethod
     def _parse_xml(root: Element) -> Report:
