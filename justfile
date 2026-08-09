@@ -56,12 +56,12 @@ version := `echo "from tomllib import load; print(load(open('pyproject.toml', 'r
     pdm run bumpver update --patch {{ ARGS }}
     pdm sync
 
-# Use BumpVer to increase the minor version number. Use just bump -d to view a dry-run.
+# Use BumpVer to increase the minor version number. Use just bump-minor -d to view a dry-run.
 @bump-minor *ARGS:
     pdm run bumpver update --minor {{ ARGS }}
     pdm sync
 
-# Use BumpVer to increase the major version number. Use just bump -d to view a dry-run.
+# Use BumpVer to increase the major version number. Use just bump-major -d to view a dry-run.
 @bump-major *ARGS:
     pdm run bumpver update --major {{ ARGS }}
     pdm sync
