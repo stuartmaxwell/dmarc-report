@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import ClassVar
 
+from dmarc_report.exceptions import DMARCParseError
+
 
 class PolicyType(str, Enum):
     """Policy types for DMARC."""
@@ -102,7 +104,7 @@ class PolicyPublished:
         # Validate percentage
         if not 0 <= self.pct <= 100:  # noqa: PLR2004
             msg = f"Percentage must be between 0 and 100, got {self.pct}"
-            raise ValueError(msg)
+            raise DMARCParseError(msg)
 
 
 @dataclass
@@ -178,7 +180,7 @@ class SPFAuthResult:
             self.result = AuthResultType(self.result)
         if self.scope and self.scope not in self.VALID_SCOPES:
             msg = f"Invalid scope: {self.scope}. Must be one of {self.VALID_SCOPES}"
-            raise ValueError(msg)
+            raise DMARCParseError(msg)
 
 
 @dataclass

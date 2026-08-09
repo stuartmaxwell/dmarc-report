@@ -5,26 +5,18 @@ import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, ParseError
 
 from defusedxml import ElementTree
 
-from dmarc_report.schema import (
-    AuthResults,
-    DateRange,
-    DKIMAuthResult,
-    Identifier,
-    PolicyEvaluated,
-    PolicyPublished,
-    Record,
-    Report,
-    ReportMetadata,
-    SPFAuthResult,
-)
+from dmarc_report import exceptions, schema
 
 # https://garykessler.net/library/file_sigs_GCK_latest.html
 GZIP_MAGIC = b"\x1f\x8b\x08"
 ZIP_MAGIC = b"PK\x03\x04"
+
+# Exceptions that indicate the input was malformed rather than a bug in the parser itself.
+_MALFORMED_INPUT_ERRORS = (AttributeError, TypeError, ValueError, OSError, zipfile.BadZipFile, ParseError)
 
 
 class DMARCParser:
@@ -36,7 +28,7 @@ class DMARCParser:
     """
 
     @staticmethod
-    def parse_file(filepath: str) -> Report:
+    def parse_file(filepath: str) -> schema.Report:
         """Parse a DMARC report file and return a Report object.
 
         Handles .xml, .xml.gz, and .zip file types.
@@ -46,12 +38,17 @@ class DMARCParser:
 
         Returns:
             Report: A Report object containing the parsed DMARC report data.
+
+        Raises:
+            OSError: If the file can't be read (e.g. it doesn't exist).
+            DMARCParseError: If the file's content is corrupt, isn't valid XML, or doesn't match the
+                expected DMARC report structure.
         """
         content = Path(filepath).read_bytes()
         return DMARCParser.parse_bytes(content)
 
     @staticmethod
-    def parse_bytes(content: bytes) -> Report:
+    def parse_bytes(content: bytes) -> schema.Report:
         """Parse DMARC report content and return a Report object.
 
         Handles gzip-compressed, zip-compressed, and plain XML content, detected by inspecting the leading
@@ -64,11 +61,16 @@ class DMARCParser:
             Report: A Report object containing the parsed DMARC report data.
 
         Raises:
-            ValueError: If a zip archive is provided but contains no XML file.
+            DMARCParseError: If the content is corrupt, isn't valid XML, or doesn't match the expected
+                DMARC report structure.
         """
-        xml_content = DMARCParser._decompress(content)
-        root = ElementTree.fromstring(xml_content)
-        return DMARCParser._parse_xml(root)
+        try:
+            xml_content = DMARCParser._decompress(content)
+            root = ElementTree.fromstring(xml_content)
+            return DMARCParser._parse_xml(root)
+        except _MALFORMED_INPUT_ERRORS as e:
+            msg = f"Failed to parse DMARC report: {e}"
+            raise exceptions.DMARCParseError(msg) from e
 
     @staticmethod
     def _decompress(content: bytes) -> str:
@@ -104,7 +106,7 @@ class DMARCParser:
         return content.decode("utf-8")
 
     @staticmethod
-    def _parse_xml(root: Element) -> Report:
+    def _parse_xml(root: Element) -> schema.Report:
         """Parse an XML ElementTree and return a Report object.
 
         This is the main logic that parses the DMARC XML report.
@@ -124,11 +126,11 @@ class DMARCParser:
             default_ns = root.tag.split("}")[0] + "}"
         # Extract report metadata
         report_metadata = root.find(f"{default_ns}report_metadata")
-        metadata = ReportMetadata(
+        metadata = schema.ReportMetadata(
             org_name=report_metadata.findtext(f"{default_ns}org_name"),
             email=report_metadata.findtext(f"{default_ns}email"),
             report_id=report_metadata.findtext(f"{default_ns}report_id"),
-            date_range=DateRange(
+            date_range=schema.DateRange(
                 begin=int(report_metadata.find(f"{default_ns}date_range").findtext(f"{default_ns}begin")),
                 end=int(report_metadata.find(f"{default_ns}date_range").findtext(f"{default_ns}end")),
             ),
@@ -137,7 +139,7 @@ class DMARCParser:
 
         # Extract policy published
         policy_published = root.find(f"{default_ns}policy_published")
-        policy = PolicyPublished(
+        policy = schema.PolicyPublished(
             domain=policy_published.findtext(f"{default_ns}domain"),
             p=policy_published.findtext(f"{default_ns}p"),
             sp=policy_published.findtext(f"{default_ns}sp", "none") or "none",
@@ -148,7 +150,7 @@ class DMARCParser:
         )
 
         # Extract records
-        records: list[Record] = []
+        records: list[schema.Record] = []
         all_records = root.findall(f".//{default_ns}record")
         for record in all_records:
             # Parse authentication results
@@ -156,7 +158,7 @@ class DMARCParser:
 
             dkim_results_elem = auth_results_elem.findall(f"{default_ns}dkim")
             dkim_auth_results = [
-                DKIMAuthResult(
+                schema.DKIMAuthResult(
                     domain=dkim_result.findtext(f"{default_ns}domain"),
                     result=dkim_result.findtext(f"{default_ns}result"),
                     selector=dkim_result.findtext(f"{default_ns}selector"),
@@ -167,7 +169,7 @@ class DMARCParser:
 
             spf_results_elem = auth_results_elem.findall(f"{default_ns}spf")
             spf_auth_results = [
-                SPFAuthResult(
+                schema.SPFAuthResult(
                     domain=spf_result.findtext(f"{default_ns}domain"),
                     result=spf_result.findtext(f"{default_ns}result"),
                     scope=spf_result.findtext(f"{default_ns}scope"),
@@ -176,21 +178,21 @@ class DMARCParser:
                 for spf_result in spf_results_elem
             ]
 
-            auth_results = AuthResults(
+            auth_results = schema.AuthResults(
                 dkim=dkim_auth_results,
                 spf=spf_auth_results,
             )
 
             # Create row object
-            row = Record(
+            row = schema.Record(
                 source_ip=record.findtext(f".//{default_ns}source_ip"),
                 count=int(record.findtext(f".//{default_ns}count")),
-                policy_evaluated=PolicyEvaluated(
+                policy_evaluated=schema.PolicyEvaluated(
                     disposition=record.findtext(f".//{default_ns}disposition"),
                     dkim=record.findtext(f".//{default_ns}dkim"),
                     spf=record.findtext(f".//{default_ns}spf"),
                 ),
-                identifiers=Identifier(
+                identifiers=schema.Identifier(
                     header_from=record.findtext(f".//{default_ns}identifiers/{default_ns}header_from"),
                     envelope_from=record.findtext(f".//{default_ns}identifiers/{default_ns}envelope_from"),
                     envelope_to=record.findtext(f".//{default_ns}identifiers/{default_ns}envelope_to"),
@@ -199,7 +201,7 @@ class DMARCParser:
             )
             records.append(row)
 
-        return Report(
+        return schema.Report(
             report_metadata=metadata,
             policy_published=policy,
             records=records,
