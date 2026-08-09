@@ -3,36 +3,32 @@
 import gzip
 import zipfile
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
-from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element, ParseError
 
 from defusedxml import ElementTree
 
-from dmarc_report.schema import (
-    AuthResults,
-    DateRange,
-    DKIMAuthResult,
-    Identifier,
-    PolicyEvaluated,
-    PolicyPublished,
-    Record,
-    Report,
-    ReportMetadata,
-    SPFAuthResult,
-)
+from dmarc_report import exceptions, schema
+
+# https://garykessler.net/library/file_sigs_GCK_latest.html
+GZIP_MAGIC = b"\x1f\x8b\x08"
+ZIP_MAGIC = b"PK\x03\x04"
+
+# Exceptions that indicate the input was malformed rather than a bug in the parser itself.
+_MALFORMED_INPUT_ERRORS = (AttributeError, TypeError, ValueError, OSError, zipfile.BadZipFile, ParseError)
 
 
 class DMARCParser:
     """Parse DMARC XML reports.
 
-    This class provides methods to parse DMARC XML reports from files and strings.
+    This class provides methods to parse DMARC XML reports from files and in-memory bytes.
 
-    When used with the `parse_file` method, it can handle .xml, .xml.gz, and .zip file types, and will return a Report
-    object.
+    Gzip-compressed, zip-compressed, and plain XML content are detected from the "magic bytes" rather than a filename.
     """
 
     @staticmethod
-    def parse_file(filepath: str) -> Report:
+    def parse_file(filepath: str) -> schema.Report:
         """Parse a DMARC report file and return a Report object.
 
         Handles .xml, .xml.gz, and .zip file types.
@@ -44,79 +40,73 @@ class DMARCParser:
             Report: A Report object containing the parsed DMARC report data.
 
         Raises:
-            ValueError: If the file type is not supported.
+            OSError: If the file can't be read (e.g. it doesn't exist).
+            DMARCParseError: If the file's content is corrupt, isn't valid XML, or doesn't match the
+                expected DMARC report structure.
         """
-        filepath = Path(filepath)
-        suffix = filepath.suffix.lower()
-
-        if suffix == ".zip":
-            content = DMARCParser._read_zip(filepath)
-        elif suffix == ".gz":
-            content = DMARCParser._read_gzip(filepath)
-        elif suffix == ".xml":
-            content = DMARCParser._read_xml(filepath)
-        else:
-            msg = f"Unsupported file type: {filepath.suffix}"
-            raise ValueError(msg)
-
-        # Parse the content into a Report object
-        root = ElementTree.fromstring(content)
-        return DMARCParser._parse_xml(root)
+        content = Path(filepath).read_bytes()
+        return DMARCParser.parse_bytes(content)
 
     @staticmethod
-    def _read_zip(filepath: str) -> str:
-        """Parse a zipped DMARC XML report file and return the content.
+    def parse_bytes(content: bytes) -> schema.Report:
+        """Parse DMARC report content and return a Report object.
 
-        Looks for the first .xml file in the zip archive.
+        Handles gzip-compressed, zip-compressed, and plain XML content, detected by inspecting the leading
+        bytes.
 
         Args:
-            filepath (str): Path to the zip archive containing the DMARC XML report.
+            content (bytes): The raw DMARC report content.
 
         Returns:
-            str: The content of the first XML file found in the zip archive.
+            Report: A Report object containing the parsed DMARC report data.
 
         Raises:
-            ValueError: If no XML file is found in the zip archive.
+            DMARCParseError: If the content is corrupt, isn't valid XML, or doesn't match the expected
+                DMARC report structure.
         """
-        with zipfile.ZipFile(filepath) as zip_file:
-            # Find the first XML file in the archive
-            xml_files = [f for f in zip_file.namelist() if f.lower().endswith(".xml")]
-            if not xml_files:
-                msg = f"No XML file found in zip archive: {filepath}"
-                raise ValueError(msg)
-
-            # Read the first XML file
-            with zip_file.open(xml_files[0]) as f:
-                return f.read().decode("utf-8")
+        try:
+            xml_content = DMARCParser._decompress(content)
+            root = ElementTree.fromstring(xml_content)
+            return DMARCParser._parse_xml(root)
+        except _MALFORMED_INPUT_ERRORS as e:
+            msg = f"Failed to parse DMARC report: {e}"
+            raise exceptions.DMARCParseError(msg) from e
 
     @staticmethod
-    def _read_gzip(filepath: str) -> str:
-        """Parse a gzipped DMARC XML report file and return the content.
+    def _decompress(content: bytes) -> str:
+        """Decode raw DMARC report bytes to an XML string.
+
+        Detects gzip and zip compression from the content's magic bytes, and then decompresses and returns the content
+        as utf-8. If the content doesn't match gzip or zip types, then it assumes xml and returns as utf-8.
 
         Args:
-            filepath (str): Path to the gzipped DMARC XML report file.
+            content (bytes): The raw DMARC report content.
 
         Returns:
-            str: The content of the gzipped XML file.
+            str: The decoded XML content.
+
+        Raises:
+            ValueError: If a zip archive is provided but contains no XML file.
         """
-        with gzip.open(filepath, "rt", encoding="utf-8") as f:
-            return f.read()
+        if content.startswith(GZIP_MAGIC):
+            return gzip.decompress(content).decode("utf-8")
+
+        if content.startswith(ZIP_MAGIC):
+            with zipfile.ZipFile(BytesIO(content)) as zip_file:
+                # Find the first XML file in the archive
+                xml_files = [f for f in zip_file.namelist() if f.lower().endswith(".xml")]
+                if not xml_files:
+                    msg = "No XML file found in zip archive"
+                    raise ValueError(msg)
+
+                # Read the first XML file
+                with zip_file.open(xml_files[0]) as f:
+                    return f.read().decode("utf-8")
+
+        return content.decode("utf-8")
 
     @staticmethod
-    def _read_xml(filepath: str) -> str:
-        """Parse a DMARC XML report file and return the content.
-
-        Args:
-            filepath (str): Path to the DMARC XML report file.
-
-        Returns:
-            str: The content of the XML file.
-        """
-        with Path.open(filepath, encoding="utf-8") as f:
-            return f.read()
-
-    @staticmethod
-    def _parse_xml(root: Element) -> Report:
+    def _parse_xml(root: Element) -> schema.Report:
         """Parse an XML ElementTree and return a Report object.
 
         This is the main logic that parses the DMARC XML report.
@@ -136,11 +126,11 @@ class DMARCParser:
             default_ns = root.tag.split("}")[0] + "}"
         # Extract report metadata
         report_metadata = root.find(f"{default_ns}report_metadata")
-        metadata = ReportMetadata(
+        metadata = schema.ReportMetadata(
             org_name=report_metadata.findtext(f"{default_ns}org_name"),
             email=report_metadata.findtext(f"{default_ns}email"),
             report_id=report_metadata.findtext(f"{default_ns}report_id"),
-            date_range=DateRange(
+            date_range=schema.DateRange(
                 begin=int(report_metadata.find(f"{default_ns}date_range").findtext(f"{default_ns}begin")),
                 end=int(report_metadata.find(f"{default_ns}date_range").findtext(f"{default_ns}end")),
             ),
@@ -149,7 +139,7 @@ class DMARCParser:
 
         # Extract policy published
         policy_published = root.find(f"{default_ns}policy_published")
-        policy = PolicyPublished(
+        policy = schema.PolicyPublished(
             domain=policy_published.findtext(f"{default_ns}domain"),
             p=policy_published.findtext(f"{default_ns}p"),
             sp=policy_published.findtext(f"{default_ns}sp", "none") or "none",
@@ -160,7 +150,7 @@ class DMARCParser:
         )
 
         # Extract records
-        records: list[Record] = []
+        records: list[schema.Record] = []
         all_records = root.findall(f".//{default_ns}record")
         for record in all_records:
             # Parse authentication results
@@ -168,7 +158,7 @@ class DMARCParser:
 
             dkim_results_elem = auth_results_elem.findall(f"{default_ns}dkim")
             dkim_auth_results = [
-                DKIMAuthResult(
+                schema.DKIMAuthResult(
                     domain=dkim_result.findtext(f"{default_ns}domain"),
                     result=dkim_result.findtext(f"{default_ns}result"),
                     selector=dkim_result.findtext(f"{default_ns}selector"),
@@ -179,7 +169,7 @@ class DMARCParser:
 
             spf_results_elem = auth_results_elem.findall(f"{default_ns}spf")
             spf_auth_results = [
-                SPFAuthResult(
+                schema.SPFAuthResult(
                     domain=spf_result.findtext(f"{default_ns}domain"),
                     result=spf_result.findtext(f"{default_ns}result"),
                     scope=spf_result.findtext(f"{default_ns}scope"),
@@ -188,21 +178,21 @@ class DMARCParser:
                 for spf_result in spf_results_elem
             ]
 
-            auth_results = AuthResults(
+            auth_results = schema.AuthResults(
                 dkim=dkim_auth_results,
                 spf=spf_auth_results,
             )
 
             # Create row object
-            row = Record(
+            row = schema.Record(
                 source_ip=record.findtext(f".//{default_ns}source_ip"),
                 count=int(record.findtext(f".//{default_ns}count")),
-                policy_evaluated=PolicyEvaluated(
+                policy_evaluated=schema.PolicyEvaluated(
                     disposition=record.findtext(f".//{default_ns}disposition"),
                     dkim=record.findtext(f".//{default_ns}dkim"),
                     spf=record.findtext(f".//{default_ns}spf"),
                 ),
-                identifiers=Identifier(
+                identifiers=schema.Identifier(
                     header_from=record.findtext(f".//{default_ns}identifiers/{default_ns}header_from"),
                     envelope_from=record.findtext(f".//{default_ns}identifiers/{default_ns}envelope_from"),
                     envelope_to=record.findtext(f".//{default_ns}identifiers/{default_ns}envelope_to"),
@@ -211,7 +201,7 @@ class DMARCParser:
             )
             records.append(row)
 
-        return Report(
+        return schema.Report(
             report_metadata=metadata,
             policy_published=policy,
             records=records,

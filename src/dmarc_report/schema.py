@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import ClassVar
 
+from dmarc_report.exceptions import DMARCParseError
 
-class PolicyType(Enum):
+
+class PolicyType(str, Enum):
     """Policy types for DMARC."""
 
     NONE = "none"
@@ -14,14 +16,14 @@ class PolicyType(Enum):
     REJECT = "reject"
 
 
-class AlignmentMode(Enum):
+class AlignmentMode(str, Enum):
     """Alignment modes for DKIM and SPF."""
 
     RELAXED = "r"
     STRICT = "s"
 
 
-class AuthResultType(Enum):
+class AuthResultType(str, Enum):
     """Authentication result types for DKIM and SPF.
 
     The AuthResultType enum corresponds to the <result> element in the <dkim> and <spf> elements of the DMARC XML
@@ -102,7 +104,7 @@ class PolicyPublished:
         # Validate percentage
         if not 0 <= self.pct <= 100:  # noqa: PLR2004
             msg = f"Percentage must be between 0 and 100, got {self.pct}"
-            raise ValueError(msg)
+            raise DMARCParseError(msg)
 
 
 @dataclass
@@ -178,7 +180,7 @@ class SPFAuthResult:
             self.result = AuthResultType(self.result)
         if self.scope and self.scope not in self.VALID_SCOPES:
             msg = f"Invalid scope: {self.scope}. Must be one of {self.VALID_SCOPES}"
-            raise ValueError(msg)
+            raise DMARCParseError(msg)
 
 
 @dataclass

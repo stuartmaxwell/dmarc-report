@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from dmarc_report.parser import DMARCParser
+from dmarc_report import exceptions, parser
 
 valid_xml_reports = [
     "reports/dmarc-sample-1.xml",
@@ -63,8 +63,30 @@ def test_reports_exist(report) -> None:
 def test_invalid_report(invalid_report) -> None:
     """Test an invalid report."""
     test_file = Path(__file__).parent / invalid_report
-    with pytest.raises(Exception):
-        DMARCParser.parse_file(test_file)
+    with pytest.raises(exceptions.DMARCParseError):
+        parser.DMARCParser.parse_file(test_file)
+
+
+@pytest.mark.parametrize(
+    "valid_report",
+    valid_xml_reports + valid_gz_reports + valid_zip_reports,
+)
+def test_valid_report_bytes(valid_report) -> None:
+    """Test parsing valid reports from in-memory bytes, regardless of file extension."""
+    test_file = Path(__file__).parent / valid_report
+    report = parser.DMARCParser.parse_bytes(test_file.read_bytes())
+    assert report.records
+
+
+@pytest.mark.parametrize(
+    "invalid_report",
+    invalid_xml_reports + invalid_gz_reports + invalid_zip_reports,
+)
+def test_invalid_report_bytes(invalid_report) -> None:
+    """Test parsing invalid reports from in-memory bytes."""
+    test_file = Path(__file__).parent / invalid_report
+    with pytest.raises(exceptions.DMARCParseError):
+        parser.DMARCParser.parse_bytes(test_file.read_bytes())
 
 
 @pytest.mark.parametrize(
