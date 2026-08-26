@@ -183,13 +183,9 @@ def test_rfc9990_multiple_reported_errors_are_preserved() -> None:
     assert report.report_metadata.errors == ["First reported error.", "Second reported error."]
 
 
-def test_primary_v3_api_is_exported_from_package_root() -> None:
-    """Expose the parser, limits, schema enums, and error contract directly."""
+def test_package_root_exposes_version() -> None:
+    """Keep package metadata available without duplicating module APIs."""
     assert dmarc_report.__version__ == "3.0.0"
-    assert dmarc_report.DMARCParser is DMARCParser
-    assert dmarc_report.ParserLimits is ParserLimits
-    assert dmarc_report.PublishedPolicy is schema.PublishedPolicy
-    assert dmarc_report.DMARCParseError is exceptions.DMARCParseError
 
 
 @pytest.mark.parametrize(
