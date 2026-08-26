@@ -13,6 +13,9 @@ valid_xml_reports = [
     "reports/dmarc-sample-3.xml",
     "reports/dmarc-empty-sp.xml",
     "reports/dmarc-feedback_namespace.xml",
+    "reports/legacy-namespaced.xml",
+    "reports/legacy-np-extension.xml",
+    "reports/rfc9990-sample.xml",
 ]
 
 invalid_xml_reports = [

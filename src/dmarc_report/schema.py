@@ -1,205 +1,268 @@
-"""Parse DMARC XML reports and display the results using Rich tables and panels."""
+"""Typed schema returned by the DMARC aggregate report parser."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import ClassVar
-
-from dmarc_report.exceptions import DMARCParseError
 
 
-class PolicyType(str, Enum):
-    """Policy types for DMARC."""
+class PublishedPolicy(str, Enum):
+    """A policy published by a domain owner."""
 
     NONE = "none"
     QUARANTINE = "quarantine"
     REJECT = "reject"
 
 
-class AlignmentMode(str, Enum):
-    """Alignment modes for DKIM and SPF."""
-
-    RELAXED = "r"
-    STRICT = "s"
-
-
-class AuthResultType(str, Enum):
-    """Authentication result types for DKIM and SPF.
-
-    The AuthResultType enum corresponds to the <result> element in the <dkim> and <spf> elements of the DMARC XML
-    report.
-    """
+class ActionDisposition(str, Enum):
+    """The action a receiver applied to a group of messages."""
 
     NONE = "none"
-    PASS = "pass"  # noqa: S105
+    PASS = "pass"
+    QUARANTINE = "quarantine"
+    REJECT = "reject"
+
+
+class DMARCResult(str, Enum):
+    """A DKIM or SPF DMARC identifier-alignment result."""
+
+    PASS = "pass"
+    FAIL = "fail"
+
+
+class DKIMResult(str, Enum):
+    """An underlying DKIM authentication result."""
+
+    NONE = "none"
+    PASS = "pass"
     FAIL = "fail"
     POLICY = "policy"
     NEUTRAL = "neutral"
     TEMPERROR = "temperror"
     PERMERROR = "permerror"
-    SOFTFAIL = "softfail"  # SPF only
+
+
+class SPFResult(str, Enum):
+    """An underlying SPF authentication result."""
+
+    NONE = "none"
+    PASS = "pass"
+    FAIL = "fail"
+    SOFTFAIL = "softfail"
+    POLICY = "policy"
+    NEUTRAL = "neutral"
+    TEMPERROR = "temperror"
+    PERMERROR = "permerror"
+
+
+class AlignmentMode(str, Enum):
+    """A DKIM or SPF identifier-alignment mode."""
+
+    RELAXED = "r"
+    STRICT = "s"
+
+
+class SPFScope(str, Enum):
+    """The identity used for an SPF authentication result."""
+
+    MFROM = "mfrom"
+    HELO = "helo"
+
+
+class PolicyOverrideType(str, Enum):
+    """A standards-defined reason for overriding the published policy."""
+
+    LOCAL_POLICY = "local_policy"
+    MAILING_LIST = "mailing_list"
+    OTHER = "other"
+    POLICY_TEST_MODE = "policy_test_mode"
+    TRUSTED_FORWARDER = "trusted_forwarder"
+    FORWARDED = "forwarded"
+    SAMPLED_OUT = "sampled_out"
+
+
+class DiscoveryMethod(str, Enum):
+    """The method used to discover the applicable DMARC policy."""
+
+    PSL = "psl"
+    TREEWALK = "treewalk"
+
+
+class TestingMode(str, Enum):
+    """Whether the published policy requested testing mode."""
+
+    NO = "n"
+    YES = "y"
+
+
+class ReportFormat(str, Enum):
+    """The recognized aggregate report format family."""
+
+    LEGACY = "legacy"
+    RFC_9990 = "rfc_9990"
+
+
+@dataclass
+class ParserWarning:
+    """A non-fatal, structured compatibility warning."""
+
+    code: str
+    message: str
 
 
 @dataclass
 class DateRange:
-    """Date range object containing begin and end timestamps.
-
-    The DateRange object corresponds to the <date_range> element in the DMARC XML report.
-    """
+    """The reporting period as integer Unix timestamps."""
 
     begin: int
     end: int
 
-    def __str__(self) -> str:
-        """Return formatted date range string."""
-        return f"{self.format_timestamp(self.begin)} to {self.format_timestamp(self.end)}"
+    @property
+    def begin_datetime(self) -> datetime:
+        """Return the beginning of the reporting period as a UTC datetime."""
+        return datetime.fromtimestamp(self.begin, tz=timezone.utc)
 
-    @staticmethod
-    def format_timestamp(timestamp: int) -> str:
-        """Convert UTC Unix timestamp to formatted UTC date string."""
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    @property
+    def end_datetime(self) -> datetime:
+        """Return the end of the reporting period as a UTC datetime."""
+        return datetime.fromtimestamp(self.end, tz=timezone.utc)
+
+    def __str__(self) -> str:
+        """Return the reporting period formatted in UTC."""
+        date_format = "%Y-%m-%d %H:%M:%S UTC"
+        begin = self.begin_datetime.strftime(date_format)
+        end = self.end_datetime.strftime(date_format)
+        return f"{begin} to {end}"
 
 
 @dataclass
 class ReportMetadata:
-    """Report metadata object containing report recipient details.
-
-    The ReportMetadata object corresponds to the <report_metadata> element in the DMARC XML report.
-    """
+    """Metadata supplied by the report generator."""
 
     org_name: str
     email: str
     report_id: str
     date_range: DateRange
     extra_contact_info: str | None = None
-    errors: list[str] | None = None  # Not yet implemented
+    errors: list[str] = field(default_factory=list)
+    generator: str | None = None
 
 
 @dataclass
 class PolicyPublished:
-    """Policy published object containing DMARC policy details.
-
-    The PolicyPublished object corresponds to the <policy_published> element in the DMARC XML report.
-    """
+    """Published policy values, with absent optional fields kept as ``None``."""
 
     domain: str
-    p: PolicyType
-    sp: PolicyType
-    pct: int  # 0-100
-    adkim: AlignmentMode
-    aspf: AlignmentMode
+    p: PublishedPolicy
+    sp: PublishedPolicy | None = None
+    pct: int | None = None
+    adkim: AlignmentMode | None = None
+    aspf: AlignmentMode | None = None
     fo: str | None = None
+    np: PublishedPolicy | None = None
+    testing: TestingMode | None = None
+    discovery_method: DiscoveryMethod | None = None
+    report_format: ReportFormat = ReportFormat.LEGACY
 
-    def __post_init__(self) -> None:
-        """Convert string values to enums if needed and validate percentage."""
-        if isinstance(self.p, str):
-            self.p = PolicyType(self.p)
-        if isinstance(self.sp, str):
-            self.sp = PolicyType(self.sp)
-        if isinstance(self.adkim, str):
-            self.adkim = AlignmentMode(self.adkim)
-        if isinstance(self.aspf, str):
-            self.aspf = AlignmentMode(self.aspf)
+    @property
+    def effective_sp(self) -> PublishedPolicy:
+        """Return the subdomain policy after the format-defined default."""
+        return self.sp or self.p
 
-        # Validate percentage
-        if not 0 <= self.pct <= 100:  # noqa: PLR2004
-            msg = f"Percentage must be between 0 and 100, got {self.pct}"
-            raise DMARCParseError(msg)
+    @property
+    def effective_np(self) -> PublishedPolicy | None:
+        """Return the reported legacy extension or the RFC 9990 effective policy."""
+        if self.report_format is ReportFormat.LEGACY:
+            return self.np
+        return self.np or self.sp or self.p
+
+    @property
+    def effective_pct(self) -> int | None:
+        """Return the legacy sampling percentage, including its default."""
+        if self.report_format is ReportFormat.RFC_9990:
+            return None
+        return 100 if self.pct is None else self.pct
+
+    @property
+    def effective_adkim(self) -> AlignmentMode:
+        """Return DKIM alignment mode after its standard default."""
+        return self.adkim or AlignmentMode.RELAXED
+
+    @property
+    def effective_aspf(self) -> AlignmentMode:
+        """Return SPF alignment mode after its standard default."""
+        return self.aspf or AlignmentMode.RELAXED
+
+    @property
+    def effective_testing(self) -> TestingMode | None:
+        """Return RFC 9990 testing mode after its standard default."""
+        if self.report_format is ReportFormat.LEGACY:
+            return None
+        return self.testing or TestingMode.NO
+
+    @property
+    def effective_fo(self) -> str:
+        """Return failure-reporting options after the standard default."""
+        return self.fo or "0"
+
+
+@dataclass
+class PolicyOverrideReason:
+    """A typed reason for overriding the published policy."""
+
+    type: PolicyOverrideType
+    comment: str | None = None
 
 
 @dataclass
 class PolicyEvaluated:
-    """Policy evaluated object containing disposition and authentication results.
+    """DMARC policy results applied to a group of messages."""
 
-    The PolicyEvaluated object corresponds to the <policy_evaluated> element in the <record> element of DMARC XML
-    report.
-    """
-
-    disposition: PolicyType
-    dkim: AuthResultType
-    spf: AuthResultType
-    reason: list[dict] | None = None  # type and comment. Not yet implemented
-
-    def __post_init__(self) -> None:
-        """Convert string values to enums if needed."""
-        if isinstance(self.disposition, str):
-            self.disposition = PolicyType(self.disposition)
-        if isinstance(self.dkim, str):
-            self.dkim = AuthResultType(self.dkim)
-        if isinstance(self.spf, str):
-            self.spf = AuthResultType(self.spf)
+    disposition: ActionDisposition
+    dkim: DMARCResult
+    spf: DMARCResult
+    reasons: list[PolicyOverrideReason] = field(default_factory=list)
 
 
 @dataclass
 class Identifier:
-    """Identifier object containing message header and envelope details.
-
-    The Identifier object corresponds to the <identifiers> element in the <record> element of DMARC XML report.
-    """
+    """Message header and envelope domains used during evaluation."""
 
     header_from: str
-    envelope_to: str | None = None
     envelope_from: str | None = None
+    envelope_to: str | None = None
 
 
 @dataclass
 class DKIMAuthResult:
-    """DKIM authentication result object.
-
-    The DKIMAuthResult object corresponds to the <dkim> element in the <auth_results> element of DMARC XML report.
-    """
+    """An underlying DKIM authentication result."""
 
     domain: str
-    result: AuthResultType
+    result: DKIMResult
     selector: str | None = None
     human_result: str | None = None
-
-    def __post_init__(self) -> None:
-        """Convert string values to enums if needed."""
-        if isinstance(self.result, str):
-            self.result = AuthResultType(self.result)
 
 
 @dataclass
 class SPFAuthResult:
-    """SPF authentication result object.
-
-    The SPFAuthResult object corresponds to the <spf> element in the <auth_results> element of DMARC XML report.
-    """
+    """An underlying SPF authentication result."""
 
     domain: str
-    result: AuthResultType
-    scope: str | None = None
+    result: SPFResult
+    scope: SPFScope | None = None
     human_result: str | None = None
-
-    VALID_SCOPES: ClassVar[set[str]] = {"helo", "mfrom"}
-
-    def __post_init__(self) -> None:
-        """Convert string values to enums if needed and validate scope."""
-        if isinstance(self.result, str):
-            self.result = AuthResultType(self.result)
-        if self.scope and self.scope not in self.VALID_SCOPES:
-            msg = f"Invalid scope: {self.scope}. Must be one of {self.VALID_SCOPES}"
-            raise DMARCParseError(msg)
 
 
 @dataclass
 class AuthResults:
-    """Authentication results for DKIM and SPF.
+    """Underlying DKIM and SPF authentication results."""
 
-    The AuthResults object corresponds to the <auth_results> element in the DMARC XML report.
-    """
-
-    dkim: list[DKIMAuthResult]
-    spf: list[SPFAuthResult]
+    dkim: list[DKIMAuthResult] = field(default_factory=list)
+    spf: list[SPFAuthResult] = field(default_factory=list)
 
 
 @dataclass
 class Record:
-    """DMARC record object containing message details and authentication results.
-
-    The Record object corresponds to the <record> element in the DMARC XML report.
-    """
+    """One aggregate group of messages and its authentication results."""
 
     source_ip: str
     count: int
@@ -210,68 +273,38 @@ class Record:
 
 @dataclass
 class Report:
-    """DMARC report object containing metadata, policy, and records.
-
-    This class provides properties and methods to access and display the DMARC report data.
-    """
+    """A parsed DMARC aggregate report."""
 
     report_metadata: ReportMetadata
     policy_published: PolicyPublished
     records: list[Record]
+    format: ReportFormat = ReportFormat.LEGACY
+    namespace: str | None = None
+    version: str | None = None
+    warnings: list[ParserWarning] = field(default_factory=list)
 
     @property
-    def org_name(self) -> str:
-        """Return the organization name of the report recipient."""
-        return self.report_metadata.org_name
-
-    @property
-    def email(self) -> str:
-        """Return the email address of the report recipient."""
-        return self.report_metadata.email
-
-    @property
-    def report_id(self) -> str:
-        """Return the report ID."""
-        return self.report_metadata.report_id
-
-    @property
-    def date_range(self) -> tuple[int, int]:
-        """Return the date range of the DMARC report."""
-        return (self.report_metadata.date_range.begin, self.report_metadata.date_range.end)
-
-    @property
-    def domain(self) -> str:
-        """Return the domain of the DMARC report."""
-        return self.policy_published.domain
-
-    @property
-    def summary_stats(self) -> dict:
+    def summary_stats(self) -> dict[str, object]:
         """Generate summary statistics for the report."""
         total_messages = sum(record.count for record in self.records)
-
-        # Calculate pass rates
-        dkim_pass = sum(record.count for record in self.records if record.policy_evaluated.dkim == AuthResultType.PASS)
-        spf_pass = sum(record.count for record in self.records if record.policy_evaluated.spf == AuthResultType.PASS)
-        # DMARC passes if DKIM *or* SPF aligns — this is the actual delivery outcome, unlike the two rates
-        # above considered separately.
+        dkim_pass = sum(record.count for record in self.records if record.policy_evaluated.dkim is DMARCResult.PASS)
+        spf_pass = sum(record.count for record in self.records if record.policy_evaluated.spf is DMARCResult.PASS)
         dmarc_pass = sum(
             record.count
             for record in self.records
-            if AuthResultType.PASS in (record.policy_evaluated.dkim, record.policy_evaluated.spf)
+            if DMARCResult.PASS in (record.policy_evaluated.dkim, record.policy_evaluated.spf)
         )
 
-        # Count dispositions
-        dispositions = {}
+        dispositions: dict[str, int] = {}
         for record in self.records:
-            disp = record.policy_evaluated.disposition.value
-            dispositions[disp] = dispositions.get(disp, 0) + record.count
+            disposition = record.policy_evaluated.disposition.value
+            dispositions[disposition] = dispositions.get(disposition, 0) + record.count
 
         return {
             "total_messages": total_messages,
             "unique_sources": len({record.source_ip for record in self.records}),
-            "dmarc_pass_rate": dmarc_pass / total_messages if total_messages > 0 else 0,
-            "dkim_pass_rate": dkim_pass / total_messages if total_messages > 0 else 0,
-            "spf_pass_rate": spf_pass / total_messages if total_messages > 0 else 0,
+            "dmarc_pass_rate": dmarc_pass / total_messages if total_messages else 0,
+            "dkim_pass_rate": dkim_pass / total_messages if total_messages else 0,
+            "spf_pass_rate": spf_pass / total_messages if total_messages else 0,
             "dispositions": dispositions,
-            "report_period": str(self.report_metadata.date_range),
         }

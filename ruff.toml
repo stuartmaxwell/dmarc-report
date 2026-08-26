@@ -7,10 +7,11 @@ typing-extensions = false
 ignore = [
   "COM812", # missing-trailing-comma
   "CPY001", # missing-copyright-notice
+  "S105",   # hardcoded-password-string (catches `PASS = "pass"`)
 ]
 
 [lint.extend-per-file-ignores]
-"tests/**" = ["B017", "PT011", "ANN001", "S101", "S603", "S607"]
+"tests/**" = ["B017", "PT011", "ANN001", "S101", "S603", "S607", "PLR2004"]
 
 [lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".

@@ -1,3 +1,3 @@
-"""DMARC report parser and display tool."""
+"""Parse and display DMARC aggregate reports."""
 
-__version__ = "2.3.0"
+__version__ = "3.0.0"
