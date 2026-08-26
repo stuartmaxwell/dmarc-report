@@ -1,7 +1,7 @@
 [project]
 name = "dmarc-report"
-version = "2.3.0"
-description = "Displays a nicely formatted report in your terminal from a DMARC XML report."
+version = "3.0.0"
+description = "Parse and display legacy and RFC 9990 DMARC aggregate reports."
 readme = "README.md"
 authors = [
     { name = "Stuart Maxwell", email = "stuart@amanzi.nz" },
@@ -59,7 +59,7 @@ build-backend = "pdm.backend"
 python_files = "test_*.py"
 
 [tool.bumpver]
-current_version = "2.3.0"
+current_version = "3.0.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "👍 bump version {old_version} -> {new_version}"
 commit = true
