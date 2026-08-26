@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feedback xmlns="urn:ietf:params:xml:ns:dmarc-2.0" xmlns:vendor="https://reporter.example/xml">
+  <version>1.0</version>
+  <report_metadata>
+    <org_name>Sample Reporter</org_name>
+    <email>report_sender@example-reporter.com</email>
+    <extra_contact_info>https://example-reporter.com/dmarc</extra_contact_info>
+    <report_id>3v98abbp8ya9n3va8yr8oa3ya</report_id>
+    <date_range>
+      <begin>302832000</begin>
+      <end>302918399</end>
+    </date_range>
+    <error>One policy lookup was temporarily unavailable.</error>
+    <generator>Example DMARC Aggregate Reporter v1.2</generator>
+  </report_metadata>
+  <policy_published>
+    <domain>example.com</domain>
+    <p>quarantine</p>
+    <sp>none</sp>
+    <np>reject</np>
+    <fo>1</fo>
+    <adkim>s</adkim>
+    <aspf>r</aspf>
+    <testing>y</testing>
+    <discovery_method>treewalk</discovery_method>
+  </policy_published>
+  <extension>
+    <vendor:reporter-region>nz</vendor:reporter-region>
+  </extension>
+  <record>
+    <row>
+      <source_ip>2001:0db8:0:0:0:0:0:1</source_ip>
+      <count>123</count>
+      <policy_evaluated>
+        <disposition>pass</disposition>
+        <dkim>pass</dkim>
+        <spf>fail</spf>
+        <reason><type>local_policy</type><comment>Local delivery rule.</comment></reason>
+        <reason><type>mailing_list</type></reason>
+        <reason><type>other</type><comment>Other handling.</comment></reason>
+        <reason><type>policy_test_mode</type></reason>
+        <reason><type>trusted_forwarder</type></reason>
+      </policy_evaluated>
+    </row>
+    <identifiers>
+      <envelope_from></envelope_from>
+      <header_from>mail.example.com</header_from>
+      <envelope_to>recipient.example</envelope_to>
+    </identifiers>
+    <auth_results>
+      <dkim>
+        <domain>example.com</domain>
+        <selector>abc123</selector>
+        <result>pass</result>
+        <human_result>Signature verified.</human_result>
+      </dkim>
+      <dkim>
+        <domain>third-party.example</domain>
+        <selector>mail</selector>
+        <result>neutral</result>
+      </dkim>
+      <spf>
+        <domain>bounce.example.com</domain>
+        <scope>mfrom</scope>
+        <result>softfail</result>
+        <human_result>Policy did not authorize this source.</human_result>
+      </spf>
+    </auth_results>
+    <vendor:record-note>retained in the raw source</vendor:record-note>
+  </record>
+  <record>
+    <row>
+      <source_ip>192.0.2.123</source_ip>
+      <count>1</count>
+      <policy_evaluated>
+        <disposition>none</disposition>
+        <dkim>fail</dkim>
+        <spf>fail</spf>
+      </policy_evaluated>
+    </row>
+    <identifiers>
+      <header_from>example.com</header_from>
+    </identifiers>
+    <auth_results></auth_results>
+  </record>
+</feedback>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feedback xmlns="http://dmarc.org/dmarc-xml/0.1">
+  <version>1.0</version>
+  <report_metadata>
+    <org_name>Legacy Reporter</org_name>
+    <email>contact text retained exactly</email>
+    <report_id>legacy/report:id</report_id>
+    <date_range><begin>1577836800</begin><end>1577923199</end></date_range>
+    <error>First policy error.</error>
+    <error>Second policy error.</error>
+  </report_metadata>
+  <policy_published>
+    <domain>legacy.example</domain>
+    <p>reject</p>
+  </policy_published>
+  <record>
+    <row>
+      <source_ip>203.0.113.20</source_ip>
+      <count>2</count>
+      <policy_evaluated>
+        <disposition>none</disposition>
+        <dkim>fail</dkim>
+        <spf>pass</spf>
+        <reason><type>forwarded</type><comment>Known forwarder.</comment></reason>
+        <reason><type>sampled_out</type></reason>
+      </policy_evaluated>
+    </row>
+    <identifiers><header_from>legacy.example</header_from></identifiers>
+    <auth_results>
+      <spf><domain>legacy.example</domain><scope>helo</scope><result>pass</result></spf>
+      <spf><domain>mail.legacy.example</domain><result>softfail</result></spf>
+    </auth_results>
+  </record>
+</feedback>
