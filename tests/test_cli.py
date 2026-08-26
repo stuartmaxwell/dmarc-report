@@ -8,23 +8,43 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
+import dmarc_report
 from dmarc_report.display import display_console
 from dmarc_report.parser import DMARCParser, ParserLimits
 
 REPORTS = Path(__file__).parent / "reports"
 
 
-def _run_cli(filepath: Path) -> subprocess.CompletedProcess[str]:
+def _run_cli(filepath: Path, *, verbose: bool = False) -> subprocess.CompletedProcess[str]:
     """Run the installed command at a stable terminal width."""
     environment = os.environ.copy()
     environment.update({"COLUMNS": "160", "LINES": "50"})
+    command = ["dmarc-report"]
+    if verbose:
+        command.append("--verbose")
+    command.append(str(filepath))
     return subprocess.run(
-        ["dmarc-report", str(filepath)],
+        command,
         check=False,
         capture_output=True,
         text=True,
         env=environment,
     )
+
+
+@pytest.mark.parametrize("option", ["--version", "-V"])
+def test_installed_cli_displays_package_version(option: str) -> None:
+    """Return the package version without requiring a report filepath."""
+    result = subprocess.run(
+        ["dmarc-report", option],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == f"dmarc-report {dmarc_report.__version__}\n"
+    assert result.stderr == ""
 
 
 @pytest.mark.parametrize(
@@ -46,8 +66,19 @@ def test_installed_cli_renders_legacy_xml_gzip_and_zip(filename) -> None:
     assert "100%" in result.stdout
     assert "DKIM pass example.com selector=default" in result.stdout
     assert "SPF pass example.com scope=mfrom" in result.stdout
+    assert "Parser Warnings" not in result.stdout
+    assert "legacy_no_namespace" not in result.stdout
+
+
+def test_installed_cli_verbose_renders_parser_warnings() -> None:
+    """Show tolerated parser deviations only when verbose output is requested."""
+    result = _run_cli(REPORTS / "dmarc-sample-1.xml", verbose=True)
+
+    assert result.returncode == 0
+    assert result.stderr == ""
     assert "Parser Warnings" in result.stdout
     assert "legacy_no_namespace" in result.stdout
+    assert "legacy_missing_version" in result.stdout
 
 
 def test_installed_cli_renders_rfc9990_fields_authentication_and_warnings() -> None:
@@ -74,7 +105,7 @@ def test_installed_cli_renders_rfc9990_fields_authentication_and_warnings() -> N
 
 def test_installed_cli_renders_legacy_np_extension_and_warning() -> None:
     """Make the retained legacy np extension visible rather than silently ignoring it."""
-    result = _run_cli(REPORTS / "legacy-np-extension.xml")
+    result = _run_cli(REPORTS / "legacy-np-extension.xml", verbose=True)
 
     assert result.returncode == 0
     assert result.stderr == ""
