@@ -181,6 +181,23 @@ def test_cli_unsupported_report_is_concise(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr
 
 
+def test_cli_rfc9990_validation_error_is_concise(tmp_path: Path) -> None:
+    """Report a current-schema violation without exposing a traceback."""
+    content = (REPORTS / "rfc9990-sample.xml").read_bytes()
+    assert b"<selector>abc123</selector>" in content
+    report_file = tmp_path / "missing-selector.xml"
+    report_file.write_bytes(content.replace(b"<selector>abc123</selector>", b"", 1))
+
+    result = _run_cli(report_file)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "required <selector> field is missing" in result.stderr
+    assert "<dkim>" in result.stderr
+    assert "[missing_field]" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 def test_cli_oversized_report_is_concise(tmp_path: Path) -> None:
     """Apply default input limits through the command entry point."""
     report_file = tmp_path / "oversized.xml"

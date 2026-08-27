@@ -125,7 +125,14 @@ class DMARCXMLParser:
 
     def _parse_metadata(self, element: Element) -> schema.ReportMetadata:
         """Parse reporter identity, report period, and generator diagnostics."""
-        error_elements = element.findall("error", self.namespaces)
+        if self.report_format is schema.ReportFormat.RFC_9990:
+            # RFC 9990 allows zero or one <error>, _optional_text raises an error if multiple are found.
+            error = self._optional_text(element, "error")
+            # Save as a list to be consistent with legacy reports.
+            errors = [] if error is None else [error]
+        else:
+            # The legacy format permits multiple <error> elements.
+            errors = [self._text(error) for error in element.findall("error", self.namespaces)]
 
         date_element = self._required_child(element, "date_range")
         begin = self._required_integer(date_element, "begin")
@@ -145,20 +152,62 @@ class DMARCXMLParser:
             org_name=self._required_text(element, "org_name"),
             email=self._required_text(element, "email"),
             extra_contact_info=self._optional_text(element, "extra_contact_info"),
-            report_id=self._required_text(element, "report_id"),
+            report_id=self._parse_report_id(element),
             date_range=schema.DateRange(begin=begin, end=end),
-            errors=[self._text(error) for error in error_elements],
+            errors=errors,
             generator=self._optional_text(element, "generator"),
+        )
+
+    def _parse_report_id(self, element: Element) -> str:
+        """Read Report-ID and enforce the RFC 9990 dot-atom form when current.
+
+        Legacy generators use a wide variety of identifiers, so their non-empty
+        text remains untouched. RFC 9990 defines a dot-atom value, optionally
+        containing an ``@`` and optionally enclosed in angle brackets.
+        """
+        report_id = self._required_text(element, "report_id")
+        if self.report_format is schema.ReportFormat.RFC_9990 and not self._is_valid_report_id(report_id):
+            msg = "The <report_id> field does not use the RFC 9990 Report-ID format."
+            raise exceptions.FieldValueError(msg)
+        return report_id
+
+    def _is_valid_report_id(self, value: str) -> bool:
+        """Return whether a value has RFC 9990's simple Report-ID structure."""
+        if value.startswith("<") and value.endswith(">"):
+            value = value[1:-1]
+        elif value.startswith("<") or value.endswith(">"):
+            return False
+
+        if value.count("@") > 1:
+            return False
+        return all(self._is_dot_atom(part) for part in value.split("@"))
+
+    def _is_dot_atom(self, value: str) -> bool:
+        """Validate RFC 5322 dot-atom text without a regular expression."""
+        report_id_symbols = frozenset("!#$%&'*+-/=?^_`{|}~")  # RFC 5322 atext punctuation
+
+        atoms = value.split(".")
+        return bool(value) and all(
+            atom
+            and all(
+                character.isascii() and (character.isalnum() or character in report_id_symbols) for character in atom
+            )
+            for atom in atoms
         )
 
     def _parse_policy(self, element: Element) -> schema.PolicyPublished:
         """Parse source policy values while leaving standard defaults explicit."""
         published_policy = self._required_enum(element, "p", schema.PublishedPolicy)
 
-        # An empty optional policy carries no more information than an omitted
-        # one, so both use the standard fallback to p.
+        # A missing sp inherits p. Known legacy reports also send an empty sp,
+        # but RFC 9990 requires a valid policy whenever the element is present.
         sp_text = self._optional_text(element, "sp")
-        if sp_text is None or not sp_text.strip():
+        if sp_text is None:
+            subdomain_policy = None
+        elif not sp_text.strip():
+            if self.report_format is schema.ReportFormat.RFC_9990:
+                msg = "The <sp> field contains an invalid value."
+                raise exceptions.FieldValueError(msg)
             subdomain_policy = None
         else:
             subdomain_policy = self._enum_value(
@@ -248,8 +297,15 @@ class DMARCXMLParser:
 
     def _parse_reason(self, element: Element) -> schema.PolicyOverrideReason:
         """Parse one standards-defined reason for overriding the published policy."""
+        reason_type = self._required_enum(element, "type", schema.PolicyOverrideType)
+        if self.report_format is schema.ReportFormat.RFC_9990 and reason_type in {
+            schema.PolicyOverrideType.FORWARDED,
+            schema.PolicyOverrideType.SAMPLED_OUT,
+        }:
+            msg = "The <type> field contains a legacy policy override value in an RFC 9990 report."
+            raise exceptions.FieldValueError(msg)
         return schema.PolicyOverrideReason(
-            type=self._required_enum(element, "type", schema.PolicyOverrideType),
+            type=reason_type,
             comment=self._optional_text(element, "comment"),
         )
 
@@ -272,10 +328,13 @@ class DMARCXMLParser:
                 msg,
                 code=exceptions.ParseErrorCode.AUTH_RESULT_LIMIT_EXCEEDED,
             )
+        if self.report_format is schema.ReportFormat.RFC_9990 and len(spf_elements) > 1:
+            msg_0 = "The <auth_results> field in an RFC 9990 report must not contain multiple <spf> results."
+            raise exceptions.ReportStructureError(msg_0)
         if len(spf_elements) > self.limits.max_spf_results_per_record:
-            msg_0 = "The record exceeds the configured SPF result limit."
+            msg_1 = "The record exceeds the configured SPF result limit."
             raise exceptions.ResourceLimitError(
-                msg_0,
+                msg_1,
                 code=exceptions.ParseErrorCode.AUTH_RESULT_LIMIT_EXCEEDED,
             )
         return schema.AuthResults(
@@ -285,18 +344,34 @@ class DMARCXMLParser:
 
     def _parse_dkim_result(self, element: Element) -> schema.DKIMAuthResult:
         """Parse one underlying DKIM authentication result."""
+        if self.report_format is schema.ReportFormat.RFC_9990:
+            # The element is required in RFC 9990. An explicitly blank string
+            # still satisfies the XML shape but carries no useful selector.
+            selector_text = self._text(self._required_child(element, "selector"))
+        else:
+            selector_text = self._optional_text(element, "selector")
+        selector = None if selector_text is None or not selector_text.strip() else selector_text
+
         return schema.DKIMAuthResult(
             domain=self._required_domain(element, "domain"),
-            selector=self._optional_text(element, "selector"),
+            selector=selector,
             result=self._required_enum(element, "result", schema.DKIMResult),
             human_result=self._optional_text(element, "human_result"),
         )
 
     def _parse_spf_result(self, element: Element) -> schema.SPFAuthResult:
         """Parse one underlying SPF authentication result."""
+        scope = self._optional_enum(element, "scope", schema.SPFScope)
+        if (
+            self.report_format is schema.ReportFormat.RFC_9990
+            and scope is not None
+            and scope is not schema.SPFScope.MFROM
+        ):
+            msg = "The <scope> field in an RFC 9990 report must be 'mfrom'."
+            raise exceptions.FieldValueError(msg)
         return schema.SPFAuthResult(
             domain=self._required_domain(element, "domain"),
-            scope=self._optional_enum(element, "scope", schema.SPFScope),
+            scope=scope,
             result=self._required_enum(element, "result", schema.SPFResult),
             human_result=self._optional_text(element, "human_result"),
         )

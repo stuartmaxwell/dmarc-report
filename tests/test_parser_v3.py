@@ -131,15 +131,15 @@ def test_namespace_free_legacy_report_treats_empty_sp_as_absent() -> None:
     }
 
 
-def test_rfc9990_empty_sp_uses_the_standard_p_fallback() -> None:
-    """Do not reject an otherwise usable current report for an empty optional sp."""
+def test_rfc9990_empty_sp_is_rejected() -> None:
+    """Require a valid policy value when an RFC 9990 sp element is present."""
     content = _replace(RFC_9990_XML, b"<sp>none</sp>", b"<sp></sp>")
 
-    report = DMARCParser.parse_bytes(content)
+    with pytest.raises(exceptions.FieldValueError) as caught:
+        DMARCParser.parse_bytes(content)
 
-    assert report.policy_published.sp is None
-    assert report.policy_published.effective_sp is schema.PublishedPolicy.QUARANTINE
-    assert report.warnings == []
+    assert caught.value.code is exceptions.ParseErrorCode.INVALID_VALUE
+    assert "<sp> field contains an invalid value" in str(caught.value)
 
 
 def test_legacy_np_extension_is_retained_with_a_warning() -> None:
@@ -170,22 +170,24 @@ def test_current_namespace_selects_rfc9990_format() -> None:
     assert report.warnings == []
 
 
-def test_rfc9990_multiple_reported_errors_are_preserved() -> None:
-    """Keep useful diagnostics even when a sender exceeds RFC cardinality."""
+def test_rfc9990_multiple_reported_errors_are_rejected() -> None:
+    """Enforce RFC 9990's zero-or-one cardinality for reported errors."""
     content = _replace(
         RFC_9990_XML,
         b"<error>One policy lookup was temporarily unavailable.</error>",
         b"<error>First reported error.</error><error>Second reported error.</error>",
     )
 
-    report = DMARCParser.parse_bytes(content)
+    with pytest.raises(exceptions.ReportStructureError) as caught:
+        DMARCParser.parse_bytes(content)
 
-    assert report.report_metadata.errors == ["First reported error.", "Second reported error."]
+    assert caught.value.code is exceptions.ParseErrorCode.INVALID_STRUCTURE
+    assert "<error> field appears more than once" in str(caught.value)
 
 
 def test_package_root_exposes_version() -> None:
     """Keep package metadata available without duplicating module APIs."""
-    assert dmarc_report.__version__ == "3.0.0"
+    assert dmarc_report.__version__ == "3.0.1"
 
 
 @pytest.mark.parametrize(
@@ -336,21 +338,52 @@ def test_entity_declaration_is_rejected_as_invalid_xml() -> None:
     assert caught.value.code is exceptions.ParseErrorCode.INVALID_XML
 
 
-def test_current_multiple_spf_results_and_missing_dkim_selector_are_preserved() -> None:
-    """Keep usable authentication data despite harmless schema deviations."""
+def test_rfc9990_multiple_spf_results_are_rejected() -> None:
+    """Enforce RFC 9990's zero-or-one cardinality for SPF results."""
     two_spf = _replace(
         RFC_9990_XML,
         b"</spf>\n    </auth_results>",
         b"</spf><spf><domain>second.example</domain><result>pass</result></spf>\n    </auth_results>",
     )
+
+    with pytest.raises(exceptions.ReportStructureError) as caught:
+        DMARCParser.parse_bytes(two_spf)
+
+    assert caught.value.code is exceptions.ParseErrorCode.INVALID_STRUCTURE
+    assert "must not contain multiple <spf> results" in str(caught.value)
+
+
+def test_rfc9990_missing_dkim_selector_is_rejected() -> None:
+    """Require the selector element defined by the RFC 9990 DKIM result shape."""
     no_selector = _replace(RFC_9990_XML, b"<selector>abc123</selector>", b"")
 
-    multiple_spf_report = DMARCParser.parse_bytes(two_spf)
-    missing_selector_report = DMARCParser.parse_bytes(no_selector)
+    with pytest.raises(exceptions.ReportStructureError) as caught:
+        DMARCParser.parse_bytes(no_selector)
 
-    assert len(multiple_spf_report.records[0].auth_results.spf) == 2
-    assert multiple_spf_report.records[0].auth_results.spf[1].domain == "second.example"
-    assert missing_selector_report.records[0].auth_results.dkim[0].selector is None
+    assert caught.value.code is exceptions.ParseErrorCode.MISSING_FIELD
+    assert "required <selector> field is missing from <dkim>" in str(caught.value)
+
+
+def test_rfc9990_blank_dkim_selector_is_preserved_as_none() -> None:
+    """Distinguish an explicitly blank selector from an absent required element."""
+    blank_selector = _replace(
+        RFC_9990_XML,
+        b"<selector>abc123</selector>",
+        b"<selector></selector>",
+    )
+
+    report = DMARCParser.parse_bytes(blank_selector)
+
+    assert report.records[0].auth_results.dkim[0].selector is None
+
+
+def test_legacy_missing_dkim_selector_remains_accepted() -> None:
+    """Keep accepting the selector omission seen in legacy reports."""
+    no_selector = _replace(LEGACY_XML, b"<selector>default</selector>", b"")
+
+    report = DMARCParser.parse_bytes(no_selector)
+
+    assert report.records[0].auth_results.dkim[0].selector is None
 
 
 def test_missing_spf_results_and_empty_optional_envelope_are_preserved() -> None:
@@ -402,26 +435,104 @@ def test_domain_handling_keeps_only_basic_parser_safeguards() -> None:
         DMARCParser.parse_bytes(ip_address_domain)
 
 
-def test_understood_values_are_accepted_across_report_formats() -> None:
-    """Do not reject typed values solely because they come from another schema generation."""
-    current_helo = _replace(RFC_9990_XML, b"<scope>mfrom</scope>", b"<scope>helo</scope>")
+def test_rfc9990_legacy_spf_scope_is_rejected() -> None:
+    """Accept only the mfrom scope allowed by RFC 9990 when scope is present."""
+    current_helo = _replace(
+        RFC_9990_XML,
+        b"<scope>mfrom</scope>",
+        b"<scope>helo</scope>",
+    )
+
+    with pytest.raises(exceptions.FieldValueError) as caught:
+        DMARCParser.parse_bytes(current_helo)
+
+    assert caught.value.code is exceptions.ParseErrorCode.INVALID_VALUE
+    assert "must be 'mfrom'" in str(caught.value)
+
+
+def test_rfc9990_legacy_policy_override_is_rejected() -> None:
+    """Reject override tokens that were removed from the current schema."""
+    current_forwarded = _replace(
+        RFC_9990_XML,
+        b"<type>local_policy</type>",
+        b"<type>forwarded</type>",
+    )
+
+    with pytest.raises(exceptions.FieldValueError) as caught:
+        DMARCParser.parse_bytes(current_forwarded)
+
+    assert caught.value.code is exceptions.ParseErrorCode.INVALID_VALUE
+    assert "legacy policy override value" in str(caught.value)
+
+
+def test_legacy_understood_values_remain_accepted() -> None:
+    """Keep existing tolerance for legacy values used by deployed reporters."""
     legacy_pass = _replace(LEGACY_XML, b"<disposition>none</disposition>", b"<disposition>pass</disposition>")
-    current_forwarded = _replace(RFC_9990_XML, b"<type>local_policy</type>", b"<type>forwarded</type>")
     legacy_policy_result = _replace(
         LEGACY_XML,
         b"<spf>\n        <domain>example.com</domain>\n        <result>pass</result>",
         b"<spf>\n        <domain>example.com</domain>\n        <result>policy</result>",
     )
 
-    assert DMARCParser.parse_bytes(current_helo).records[0].auth_results.spf[0].scope is schema.SPFScope.HELO
     assert DMARCParser.parse_bytes(legacy_pass).records[0].policy_evaluated.disposition is schema.ActionDisposition.PASS
-    assert (
-        DMARCParser.parse_bytes(current_forwarded).records[0].policy_evaluated.reasons[0].type
-        is schema.PolicyOverrideType.FORWARDED
-    )
     assert (
         DMARCParser.parse_bytes(legacy_policy_result).records[0].auth_results.spf[0].result is schema.SPFResult.POLICY
     )
+
+
+@pytest.mark.parametrize(
+    "report_id",
+    [
+        b"contains whitespace",
+        b"double..dot",
+        b"two@at@signs",
+        b"&lt;unclosed",
+        b"non-ascii-\xc4\x81",
+    ],
+)
+def test_rfc9990_invalid_report_id_is_rejected(report_id: bytes) -> None:
+    """Reject Report-IDs that do not use RFC 9990's dot-atom syntax."""
+    content = _replace(
+        RFC_9990_XML,
+        b"3v98abbp8ya9n3va8yr8oa3ya",
+        report_id,
+    )
+
+    with pytest.raises(exceptions.FieldValueError) as caught:
+        DMARCParser.parse_bytes(content)
+
+    assert caught.value.code is exceptions.ParseErrorCode.INVALID_VALUE
+    assert "RFC 9990 Report-ID format" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "report_id",
+    [b"report.example", b"report-123@example.test", b"&amp;id@example.test", b"&lt;id@example.test&gt;"],
+)
+def test_rfc9990_valid_report_id_is_accepted(report_id: bytes) -> None:
+    """Accept the plain, at-sign, punctuation, and bracketed RFC forms."""
+    content = _replace(
+        RFC_9990_XML,
+        b"3v98abbp8ya9n3va8yr8oa3ya",
+        report_id,
+    )
+
+    report = DMARCParser.parse_bytes(content)
+
+    assert report.report_metadata.report_id
+
+
+def test_rfc9990_multiple_extension_containers_are_ignored() -> None:
+    """Ignore extension containers because the package does not consume them."""
+    content = _replace(
+        RFC_9990_XML,
+        b"  <extension>",
+        b"  <extension></extension>\n  <extension>",
+    )
+
+    report = DMARCParser.parse_bytes(content)
+
+    assert report.policy_published.domain == "example.com"
 
 
 def test_unknown_and_extension_fields_are_ignored() -> None:

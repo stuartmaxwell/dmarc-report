@@ -139,7 +139,7 @@ The following files are where the bulk of the API logic lives:
 
 ## Resource limits and malformed input
 
-There are a number of limits that are configure to try to protect against bad attachments or rogue reports.
+There are a number of configurable limits to protect against bad attachments or rogue reports.
 If needed, you can customise the limits with the `ParserLimits` class:
 
 ```python
@@ -154,7 +154,8 @@ report = parser.DMARCParser.parse_bytes(attachment_bytes, limits=limits)
 ```
 
 Default limits are 10 MiB input, 100 MiB decompressed XML, 10 zip members, 100,000 records, 100 DKIM results per record,
-10 SPF results per record, and 64 KiB per parsed text field.
+10 SPF results per legacy record, and 64 KiB per parsed text field. RFC 9990 itself allows at most one SPF result per
+record. These configurable ceilings protect parser resources; they are separate from the report format's validity rules.
 
 All custom exceptions derive from `DMARCParseError` and expose a machine-readable `code`:
 
