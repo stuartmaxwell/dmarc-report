@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 LEGACY_NAMESPACE = "http://dmarc.org/dmarc-xml/0.1"  # identifies legacy reports
 RFC_9990_NAMESPACE = "urn:ietf:params:xml:ns:dmarc-2.0"  # identifies RFC 9990 reports
-SUPPORTED_VERSION = "1.0"  # rejects incompatible report schemas
+RFC_9990_VERSION = "1.0"  # the current schema requires this exact version
 
 _MAX_TIMESTAMP = 253_402_300_799  # keeps UTC dates within year 9999
 _MAX_COUNT = 2**63 - 1  # keeps aggregate counts within signed 64-bit storage
@@ -107,7 +107,7 @@ class DMARCXMLParser:
         raise exceptions.UnsupportedReportError(msg)
 
     def _parse_version(self) -> str | None:
-        """Validate the version when present and tolerate either format omitting it."""
+        """Validate a format-specific version and tolerate either format omitting it."""
         version_element = self._optional_child(self.root, "version")
         if version_element is None:
             if self.report_format is schema.ReportFormat.LEGACY:
@@ -118,10 +118,22 @@ class DMARCXMLParser:
             return None
 
         version = self._text(version_element).strip()
-        if version != SUPPORTED_VERSION:
+        if self.report_format is schema.ReportFormat.RFC_9990 and version != RFC_9990_VERSION:
             msg = "The report version is not supported."
             raise exceptions.UnsupportedReportError(msg)
+        if self.report_format is schema.ReportFormat.LEGACY and not self._is_decimal(version):
+            msg_0 = "The <version> field in a legacy report must contain a decimal value."
+            raise exceptions.FieldValueError(msg_0)
         return version
+
+    def _is_decimal(self, value: str) -> bool:
+        """Return whether text uses the XML Schema decimal lexical form."""
+        unsigned = value[1:] if value.startswith(("+", "-")) else value
+        integer, separator, fraction = unsigned.partition(".")
+        if separator and "." in fraction:
+            return False
+        digits = integer + fraction
+        return bool(digits) and all("0" <= character <= "9" for character in digits)
 
     def _parse_metadata(self, element: Element) -> schema.ReportMetadata:
         """Parse reporter identity, report period, and generator diagnostics."""

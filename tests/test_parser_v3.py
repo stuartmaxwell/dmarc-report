@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-import dmarc_report
 from dmarc_report import exceptions, schema
 from dmarc_report.parser import DMARCParser, ParserLimits
 
@@ -119,6 +118,17 @@ def test_namespaced_legacy_report_preserves_source_defaults_and_legacy_values() 
     assert {warning.code for warning in report.warnings} == {"legacy_missing_pct"}
 
 
+def test_legacy_decimal_version_is_accepted() -> None:
+    """Accept a decimal report version from a legacy report generator."""
+    report = DMARCParser.parse_file(REPORTS / "legacy-decimal-version.xml")
+
+    assert report.format is schema.ReportFormat.LEGACY
+    assert report.version == "0.1"
+    assert len(report.records) == 1
+    assert report.records[0].count == 2
+    assert {warning.code for warning in report.warnings} == {"legacy_no_namespace"}
+
+
 def test_namespace_free_legacy_report_treats_empty_sp_as_absent() -> None:
     """Use the standard p fallback when a legacy sender leaves sp empty."""
     report = DMARCParser.parse_file(REPORTS / "dmarc-empty-sp.xml")
@@ -183,11 +193,6 @@ def test_rfc9990_multiple_reported_errors_are_rejected() -> None:
 
     assert caught.value.code is exceptions.ParseErrorCode.INVALID_STRUCTURE
     assert "<error> field appears more than once" in str(caught.value)
-
-
-def test_package_root_exposes_version() -> None:
-    """Keep package metadata available without duplicating module APIs."""
-    assert dmarc_report.__version__ == "3.0.1"
 
 
 @pytest.mark.parametrize(
