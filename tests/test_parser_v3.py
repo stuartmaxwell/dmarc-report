@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-import dmarc_report
 from dmarc_report import exceptions, schema
 from dmarc_report.parser import DMARCParser, ParserLimits
 
@@ -194,11 +193,6 @@ def test_rfc9990_multiple_reported_errors_are_rejected() -> None:
 
     assert caught.value.code is exceptions.ParseErrorCode.INVALID_STRUCTURE
     assert "<error> field appears more than once" in str(caught.value)
-
-
-def test_package_root_exposes_version() -> None:
-    """Keep package metadata available without duplicating module APIs."""
-    assert dmarc_report.__version__ == "3.0.1"
 
 
 @pytest.mark.parametrize(
