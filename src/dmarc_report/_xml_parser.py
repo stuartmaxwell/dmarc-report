@@ -412,12 +412,23 @@ class DMARCXMLParser:
         return None if value is None else self._enum_value(value, enum_type, name)
 
     def _enum_value(self, value: str, enum_type: type[_EnumT], field_name: str) -> _EnumT:
-        """Convert a case-sensitive XML value without exposing bad input in errors."""
+        """Convert tokens, tolerating legacy authentication-result casing."""
+        normalize_case = (
+            self.report_format is schema.ReportFormat.LEGACY
+            and enum_type in (schema.SPFResult, schema.DKIMResult)
+            and value != value.lower()
+        )
         try:
-            return enum_type(value)
+            result = enum_type(value.lower() if normalize_case else value)
         except ValueError as error:
             msg = f"The <{field_name}> field contains an invalid value."
             raise exceptions.FieldValueError(msg) from error
+        if normalize_case:
+            self._warn(
+                "legacy_auth_result_case",
+                "A legacy authentication <result> value was normalized to lowercase.",
+            )
+        return result
 
     def _required_integer(self, parent: Element, name: str) -> int:
         """Read a required child field and return its value as an integer."""
