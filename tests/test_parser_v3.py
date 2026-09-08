@@ -485,6 +485,38 @@ def test_legacy_understood_values_remain_accepted() -> None:
     )
 
 
+@pytest.mark.parametrize("auth_type", ["spf", "dkim"])
+@pytest.mark.parametrize("result", [b"Fail", b"FAIL", b"fAiL"])
+def test_legacy_auth_result_case_is_normalized(auth_type: str, result: bytes) -> None:
+    """Accept the capitalized result seen in JCOM reports and warn callers."""
+    original = f"<{auth_type}>\n        <domain>example.com</domain>\n        <result>pass</result>".encode()
+    content = _replace(LEGACY_XML, original, original.replace(b"pass", result))
+
+    report = DMARCParser.parse_bytes(gzip.compress(content))
+
+    results = getattr(report.records[0].auth_results, auth_type)
+    assert results[0].result.value == "fail"
+    assert [warning.code for warning in report.warnings].count("legacy_auth_result_case") == 1
+
+
+@pytest.mark.parametrize("content", [LEGACY_XML, RFC_9990_XML])
+def test_unknown_auth_result_remains_rejected(content: bytes) -> None:
+    """Case tolerance must not turn an unknown result into a valid result."""
+    content = _replace(content, b"<result>pass</result>", b"<result>Unknown</result>")
+
+    with pytest.raises(exceptions.FieldValueError, match="<result> field contains an invalid value"):
+        DMARCParser.parse_bytes(content)
+
+
+@pytest.mark.parametrize("result", [b"Fail", b"FAIL"])
+def test_rfc9990_auth_result_case_remains_strict(result: bytes) -> None:
+    """Keep legacy casing tolerance out of the current report format."""
+    content = _replace(RFC_9990_XML, b"<result>pass</result>", b"<result>" + result + b"</result>")
+
+    with pytest.raises(exceptions.FieldValueError, match="<result> field contains an invalid value"):
+        DMARCParser.parse_bytes(content)
+
+
 @pytest.mark.parametrize(
     "report_id",
     [
