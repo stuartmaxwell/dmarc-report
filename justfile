@@ -18,6 +18,10 @@ test *ARGS:
 @nox:
     pdm run nox --session test
 
+# Test against example reports
+test-examples:
+    find ./tests/examples/ -type f -regextype posix-extended -regex '.*\.(xml\.gz|zip|xml)$' -exec ./.venv/bin/dmarc-report {} \;
+
 # Install pre-commit hooks
 pc-install:
     pdm run pre-commit install

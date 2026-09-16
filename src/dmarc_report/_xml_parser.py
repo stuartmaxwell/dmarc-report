@@ -364,10 +364,25 @@ class DMARCXMLParser:
             selector_text = self._optional_text(element, "selector")
         selector = None if selector_text is None or not selector_text.strip() else selector_text
 
+        result = self._required_enum(element, "result", schema.DKIMResult)
+        if self.report_format is schema.ReportFormat.LEGACY and result is schema.DKIMResult.NONE:
+            # Some legacy reporters emit an empty domain when no signature exists.
+            # Still require the element and enforce cardinality and text limits.
+            domain = self._text(self._required_child(element, "domain")).strip()
+            if domain:
+                self._validate_domain(domain, "domain")
+            else:
+                self._warn(
+                    "legacy_empty_dkim_domain",
+                    "An empty legacy DKIM <domain> was retained for a 'none' result.",
+                )
+        else:
+            domain = self._required_domain(element, "domain")
+
         return schema.DKIMAuthResult(
-            domain=self._required_domain(element, "domain"),
+            domain=domain,
             selector=selector,
-            result=self._required_enum(element, "result", schema.DKIMResult),
+            result=result,
             human_result=self._optional_text(element, "human_result"),
         )
 

@@ -641,3 +641,50 @@ def test_invalid_limit_configuration_is_a_programming_error(kwargs) -> None:
         ParserLimits(**kwargs)
 
     assert not isinstance(caught.value, exceptions.DMARCParseError)
+
+
+@pytest.mark.parametrize("domain", [b"<domain/>", b"<domain></domain>", b"<domain>  </domain>"])
+def test_legacy_dkim_none_accepts_empty_domain(domain: bytes) -> None:
+    """Retain KDDI's unsigned DKIM detail without discarding the report."""
+    content = _replace(
+        LEGACY_XML,
+        b"<dkim>\n        <domain>example.com</domain>",
+        b"<dkim>\n        " + domain,
+    )
+    content = _replace(content, b"<result>pass</result>", b"<result>none</result>")
+    content = _replace(content, b"<selector>default</selector>", b"<selector/>")
+    content = _replace(content, b"<result>pass</result>", b"<result>Pass</result>")
+
+    report = DMARCParser.parse_bytes(gzip.compress(content))
+
+    assert report.records[0].auth_results.dkim[0] == schema.DKIMAuthResult(
+        domain="",
+        result=schema.DKIMResult.NONE,
+        selector=None,
+    )
+    assert report.records[0].auth_results.spf[0].result is schema.SPFResult.PASS
+    assert "legacy_empty_dkim_domain" in [warning.code for warning in report.warnings]
+
+
+@pytest.mark.parametrize(
+    ("xml", "domain", "result"),
+    [
+        (LEGACY_XML, b"<domain/>", b"pass"),
+        (LEGACY_XML, b"<domain/>", b"fail"),
+        (LEGACY_XML, b"", b"none"),
+        (LEGACY_XML, b"<domain/><domain/>", b"none"),
+        (LEGACY_XML, b"<domain>192.0.2.1</domain>", b"none"),
+        (RFC_9990_XML, b"<domain/>", b"none"),
+    ],
+)
+def test_dkim_domain_tolerance_is_limited(xml: bytes, domain: bytes, result: bytes) -> None:
+    """Keep domain validation outside the explicit legacy empty/none case."""
+    content = _replace(
+        xml,
+        b"<dkim>\n        <domain>example.com</domain>",
+        b"<dkim>\n        " + domain,
+    )
+    content = _replace(content, b"<result>pass</result>", b"<result>" + result + b"</result>")
+
+    with pytest.raises(exceptions.DMARCParseError):
+        DMARCParser.parse_bytes(content)
