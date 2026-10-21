@@ -1,11 +1,11 @@
 """Typed schema returned by the DMARC aggregate report parser."""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 
-class PublishedPolicy(str, Enum):
+class PublishedPolicy(StrEnum):
     """A policy published by a domain owner."""
 
     NONE = "none"
@@ -13,7 +13,7 @@ class PublishedPolicy(str, Enum):
     REJECT = "reject"
 
 
-class ActionDisposition(str, Enum):
+class ActionDisposition(StrEnum):
     """The action a receiver applied to a group of messages."""
 
     NONE = "none"
@@ -22,14 +22,14 @@ class ActionDisposition(str, Enum):
     REJECT = "reject"
 
 
-class DMARCResult(str, Enum):
+class DMARCResult(StrEnum):
     """A DKIM or SPF DMARC identifier-alignment result."""
 
     PASS = "pass"
     FAIL = "fail"
 
 
-class DKIMResult(str, Enum):
+class DKIMResult(StrEnum):
     """An underlying DKIM authentication result."""
 
     NONE = "none"
@@ -41,7 +41,7 @@ class DKIMResult(str, Enum):
     PERMERROR = "permerror"
 
 
-class SPFResult(str, Enum):
+class SPFResult(StrEnum):
     """An underlying SPF authentication result."""
 
     NONE = "none"
@@ -54,21 +54,21 @@ class SPFResult(str, Enum):
     PERMERROR = "permerror"
 
 
-class AlignmentMode(str, Enum):
+class AlignmentMode(StrEnum):
     """A DKIM or SPF identifier-alignment mode."""
 
     RELAXED = "r"
     STRICT = "s"
 
 
-class SPFScope(str, Enum):
+class SPFScope(StrEnum):
     """The identity used for an SPF authentication result."""
 
     MFROM = "mfrom"
     HELO = "helo"
 
 
-class PolicyOverrideType(str, Enum):
+class PolicyOverrideType(StrEnum):
     """A standards-defined reason for overriding the published policy."""
 
     LOCAL_POLICY = "local_policy"
@@ -80,21 +80,21 @@ class PolicyOverrideType(str, Enum):
     SAMPLED_OUT = "sampled_out"
 
 
-class DiscoveryMethod(str, Enum):
+class DiscoveryMethod(StrEnum):
     """The method used to discover the applicable DMARC policy."""
 
     PSL = "psl"
     TREEWALK = "treewalk"
 
 
-class TestingMode(str, Enum):
+class TestingMode(StrEnum):
     """Whether the published policy requested testing mode."""
 
     NO = "n"
     YES = "y"
 
 
-class ReportFormat(str, Enum):
+class ReportFormat(StrEnum):
     """The recognized aggregate report format family."""
 
     LEGACY = "legacy"
@@ -119,12 +119,12 @@ class DateRange:
     @property
     def begin_datetime(self) -> datetime:
         """Return the beginning of the reporting period as a UTC datetime."""
-        return datetime.fromtimestamp(self.begin, tz=timezone.utc)
+        return datetime.fromtimestamp(self.begin, tz=UTC)
 
     @property
     def end_datetime(self) -> datetime:
         """Return the end of the reporting period as a UTC datetime."""
-        return datetime.fromtimestamp(self.end, tz=timezone.utc)
+        return datetime.fromtimestamp(self.end, tz=UTC)
 
     def __str__(self) -> str:
         """Return the reporting period formatted in UTC."""

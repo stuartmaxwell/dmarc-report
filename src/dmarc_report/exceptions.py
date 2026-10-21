@@ -1,9 +1,9 @@
 """Stable exceptions raised for malformed DMARC report content."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ParseErrorCode(str, Enum):
+class ParseErrorCode(StrEnum):
     """Machine-readable malformed-input reason codes."""
 
     UNSUPPORTED_REPORT = "unsupported_report"

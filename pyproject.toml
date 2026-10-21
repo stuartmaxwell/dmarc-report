@@ -1,15 +1,15 @@
 [project]
 name = "dmarc-report"
-version = "3.0.4"
+version = "3.1.0"
 description = "Parse and display legacy and RFC 9990 DMARC aggregate reports."
 readme = "README.md"
 authors = [
     { name = "Stuart Maxwell", email = "stuart@amanzi.nz" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "defusedxml>=0.7.1",
-    "rich>=13.9.4",
+    "defusedxml~=0.7",
+    "rich~=15.0",
 ]
 license = { file = "LICENSE" }
 classifiers = [
@@ -19,11 +19,11 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 keywords = [
     "dmarc",
@@ -45,10 +45,10 @@ dmarc-report = "dmarc_report.report:report"
 [dependency-groups]
 dev = [
     "bumpver~=2026.1132",
-    "nox[pbs]~=2026.7",
+    "nox[pbs]~=2026.10",
     "pytest~=9.1",
-    "ruff~=0.15",
-    "pre-commit~=4.6",
+    "ruff~=0.17",
+    "pre-commit~=4.7",
 ]
 
 [build-system]
@@ -59,7 +59,7 @@ build-backend = "pdm.backend"
 python_files = "test_*.py"
 
 [tool.bumpver]
-current_version = "3.0.4"
+current_version = "3.1.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "👍 bump version {old_version} -> {new_version}"
 commit = true
