@@ -2,7 +2,7 @@
 
 import gzip
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 
@@ -84,8 +84,8 @@ def test_date_range_exposes_epoch_and_utc_datetime_values() -> None:
 
     assert date_range.begin == 1_577_836_800
     assert date_range.end == 1_577_923_199
-    assert date_range.begin_datetime == datetime(2020, 1, 1, tzinfo=timezone.utc)
-    assert date_range.end_datetime == datetime(2020, 1, 1, 23, 59, 59, tzinfo=timezone.utc)
+    assert date_range.begin_datetime == datetime(2020, 1, 1, tzinfo=UTC)
+    assert date_range.end_datetime == datetime(2020, 1, 1, 23, 59, 59, tzinfo=UTC)
     assert str(date_range) == "2020-01-01 00:00:00 UTC to 2020-01-01 23:59:59 UTC"
 
 
